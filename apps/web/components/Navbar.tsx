@@ -1,101 +1,133 @@
-'use client';
+"use client";
 
-import { Zap, Bell, Settings } from 'lucide-react';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useChainId } from 'wagmi';
-import { WIREFLUID_TESTNET_CHAIN_ID } from '@wirefluid/contracts';
 import { useState } from 'react';
-import { AppState } from '@/types/index';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { ShieldCheck, Zap } from 'lucide-react';
+import { useChainId } from 'wagmi';
+import type { AppState, ViewType } from '@/types/index';
+import type { RoleChecks } from '@/web3/useRoleChecks';
 import { contractsConfigured } from '@/contracts/addresses';
 import { shortAddress } from '@/utils/arenaFormat';
-import type { RoleChecks } from '@/web3/useRoleChecks';
+import { useSiweSession } from '@/auth/useSiweSession';
+import { configuredChainId } from '@/chains/wireFluidTestnet';
 
 interface NavbarProps {
   state: AppState;
   roles: RoleChecks;
+  onViewChange: (view: ViewType) => void;
 }
 
-export function Navbar({ state, roles }: NavbarProps) {
-  const [showNotifications, setShowNotifications] = useState(false);
+const PLAYER_VIEWS: Array<{ label: string; view: ViewType }> = [
+  { label: 'Dashboard', view: 'DASHBOARD' },
+  { label: 'Squads', view: 'ARENA' },
+  { label: 'Leaderboard', view: 'LEADERBOARD' },
+  { label: 'Rewards', view: 'REWARDS' }
+];
+
+export function Navbar({ state, roles, onViewChange }: NavbarProps) {
+  const [authError, setAuthError] = useState<string | null>(null);
+  const auth = useSiweSession();
   const chainId = useChainId();
-  const wrongChain = chainId !== WIREFLUID_TESTNET_CHAIN_ID;
-  const roleChips = [
-    ['Admin', roles.admin],
-    ['Operator', roles.operator],
-    ['Score Publisher', roles.scorePublisher],
-    ['Treasury', roles.treasury],
-  ] as const;
+
+  const hasAdminAccess = roles.admin || roles.operator || roles.scorePublisher || roles.treasury;
+  const wrongChain = chainId !== configuredChainId;
 
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm backdrop-blur-xs">
-      {(wrongChain || !contractsConfigured) && (
-        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-          {wrongChain ? 'Switch to WireFluid Testnet before writing transactions.' : 'Contract addresses are not configured.'}
-        </div>
-      )}
-      <div className="px-4 md:px-8 py-4 flex items-center justify-between gap-4">
-        {/* Left: Logo & Brand */}
-        <div className="flex items-center gap-2 md:gap-3 min-w-0">
-          <div className="w-9 md:w-10 h-9 md:h-10 bg-teal-600 rounded-lg flex items-center justify-center shadow-sm hover:shadow-md transition-smooth transform hover:scale-105">
-            <Zap className="w-5 md:w-6 h-5 md:h-6 text-white" />
-          </div>
-          <div className="hidden sm:block">
-            <h1 className="text-lg md:text-xl font-bold text-slate-900 leading-tight">WireFluid</h1>
-            <p className="text-xs text-slate-500 font-medium">Arena</p>
-          </div>
-        </div>
-
-        {/* Center: Match Ticker */}
-        <div className="hidden lg:flex items-center gap-3 px-4 py-2.5 bg-slate-50 rounded-full border border-slate-200 shadow-sm hover:shadow-md transition-smooth group flex-shrink-0">
-          <div className="flex items-center gap-1.5">
-            <div className={`w-2 h-2 rounded-full group-hover:scale-125 transition-smooth ${wrongChain ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
-            <span className="text-sm font-semibold text-slate-900">WireFluid Testnet</span>
-            <span className="text-xs text-slate-500 font-medium">Chain {WIREFLUID_TESTNET_CHAIN_ID}</span>
-          </div>
-          <div className="w-px h-4 bg-slate-200"></div>
-          <span className="text-xs text-slate-500 hidden md:inline">{contractsConfigured ? 'Contracts ready' : 'Addresses missing'}</span>
-        </div>
-
-        {/* Right: Actions & Account */}
-        <div className="flex items-center gap-2 md:gap-3">
-          {/* Notifications */}
-          <button 
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-2.5 rounded-lg hover:bg-slate-100 transition-smooth focus-ring group hidden md:flex"
-            aria-label="Notifications"
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <button
+            onClick={() => onViewChange('DASHBOARD')}
+            className="flex items-center gap-2 text-slate-900"
           >
-            <Bell className="w-5 h-5 text-slate-600 group-hover:text-slate-900 transition-smooth" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+              <Zap className="w-4 h-4" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold leading-tight">WireFluid Arena</p>
+              <p className="text-[11px] text-slate-500 leading-tight">Fantasy Cricket</p>
+            </div>
           </button>
 
-          <div className="hidden xl:flex items-center gap-1">
-            {roleChips.map(([label, enabled]) => (
-              <span
-                key={label}
-                className={`rounded px-2 py-1 text-xs font-semibold ${
-                  enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+          <nav className="hidden xl:flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            {PLAYER_VIEWS.map((item) => (
+              <button
+                key={item.view}
+                onClick={() => onViewChange(item.view)}
+                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                  state.activeView === item.view
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {label}
-              </span>
+                {item.label}
+              </button>
             ))}
-          </div>
+            {hasAdminAccess ? (
+              <button
+                onClick={() => onViewChange('ADMIN_DASHBOARD')}
+                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                  ['ADMIN_DASHBOARD', 'PROTOCOL', 'MATCH', 'SCORE', 'TREASURY'].includes(state.activeView)
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                Admin
+              </button>
+            ) : null}
+          </nav>
 
-          <div className="hidden lg:block">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="hidden md:flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <span className={`w-2 h-2 rounded-full ${wrongChain ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+              <span className="text-xs font-semibold text-slate-700">
+                {wrongChain ? `Wrong chain (need ${configuredChainId})` : `Chain ${configuredChainId}`}
+              </span>
+            </div>
+
+            <div className="hidden md:flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <span className={`w-2 h-2 rounded-full ${contractsConfigured ? 'bg-emerald-500' : 'bg-red-400'}`} />
+              <span className="text-xs font-semibold text-slate-700">{contractsConfigured ? 'Contracts set' : 'Contracts missing'}</span>
+            </div>
+
+            <button
+              onClick={async () => {
+                setAuthError(null);
+                try {
+                  if (auth.authenticated) {
+                    await auth.signOut();
+                  } else {
+                    await auth.signIn();
+                  }
+                } catch (error) {
+                  setAuthError(error instanceof Error ? error.message : 'Authentication failed');
+                }
+              }}
+              className={`hidden md:inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold border ${
+                auth.authenticated
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-slate-200 bg-white text-slate-700'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              {auth.authenticated ? 'SIWE Signed In' : 'SIWE Sign In'}
+            </button>
+
             <ConnectButton.Custom>
               {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
                 const connected = mounted && account && chain;
                 if (!connected) {
                   return (
-                    <button onClick={openConnectModal} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white">
+                    <button onClick={openConnectModal} className="rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white">
                       Connect Wallet
                     </button>
                   );
                 }
+
                 return (
                   <button
                     onClick={chain.unsupported ? openChainModal : openAccountModal}
-                    className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+                    className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
                   >
                     {chain.unsupported ? 'Wrong network' : shortAddress(account.address)}
                   </button>
@@ -103,57 +135,28 @@ export function Navbar({ state, roles }: NavbarProps) {
               }}
             </ConnectButton.Custom>
           </div>
-
-          {/* Wallet Balance */}
-          <div className="flex items-center gap-2 px-3 md:px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg hover:border-blue-300 transition-smooth shadow-sm hover:shadow-md group">
-            <span className="text-blue-600 font-bold text-lg">WIRE</span>
-            <div className="flex-col hidden sm:flex">
-              <span className="text-xs text-slate-600 font-medium">Demo balance</span>
-              <span className="font-bold text-slate-900 text-sm tabular-nums">{state.wireBalance.toLocaleString()}</span>
-            </div>
-            <span className="text-sm md:hidden font-bold text-slate-900 tabular-nums">{state.wireBalance.toLocaleString()}</span>
-          </div>
-
-          {/* Settings */}
-          <button 
-            className="p-2.5 rounded-lg hover:bg-slate-100 transition-smooth focus-ring group hidden md:flex"
-            aria-label="Settings"
-          >
-            <Settings className="w-5 h-5 text-slate-600 group-hover:text-slate-900 transition-smooth" />
-          </button>
-
-          {/* Profile Avatar */}
-          <div className="w-9 md:w-10 h-9 md:h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full border-2 border-teal-600 shadow-sm flex items-center justify-center text-white text-xs md:text-sm font-bold hover:shadow-md transition-smooth cursor-pointer transform hover:scale-110 active:scale-95">
-            AC
-          </div>
         </div>
 
-        {/* Notification Dropdown */}
-        {showNotifications && (
-          <div className="absolute top-[73px] right-4 md:right-8 w-80 bg-white border border-slate-200 rounded-lg shadow-lg animate-slide-down z-50">
-            <div className="p-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-900">Notifications</h3>
-            </div>
-            <div className="max-h-96 overflow-y-auto">
-              {[
-                { title: 'Match Started', desc: 'KK vs MS is now LIVE', time: '2 mins' },
-                { title: 'Points Awarded', desc: 'You gained 45 points', time: '12 mins' },
-                { title: 'Rank Update', desc: 'You moved to rank #8', time: '1 hour' },
-              ].map((notif, idx) => (
-                <div key={idx} className="p-4 border-b border-slate-200 hover:bg-slate-50 transition-smooth cursor-pointer group">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900 group-hover:text-teal-600 transition-smooth">{notif.title}</p>
-                      <p className="text-sm text-slate-600 mt-0.5 line-clamp-2">{notif.desc}</p>
-                    </div>
-                    <span className="text-xs text-slate-500 whitespace-nowrap flex-shrink-0 ml-2">{notif.time}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+        <div className="mt-3 flex items-center justify-between gap-3 md:hidden">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <span className={`w-2 h-2 rounded-full ${wrongChain ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+            <span className="text-xs font-semibold text-slate-700">Chain {configuredChainId}</span>
           </div>
-        )}
+
+          {hasAdminAccess ? (
+            <button
+              onClick={() => onViewChange('ADMIN_DASHBOARD')}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900"
+            >
+              Admin
+            </button>
+          ) : null}
+        </div>
+
+        {authError ? (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{authError}</div>
+        ) : null}
       </div>
-    </nav>
+    </header>
   );
 }

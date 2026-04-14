@@ -3,7 +3,13 @@
 import { useState, useMemo } from 'react';
 import { Search, Plus } from 'lucide-react';
 import { CricketPlayer } from '@/types/index';
-import { TEAM_COLORS, ROLE_LABELS } from '@/lib/mock-data';
+
+const ROLE_LABELS: Record<string, string> = {
+  WK: 'Wicket Keeper',
+  BAT: 'Batter',
+  AR: 'All-rounder',
+  BOWL: 'Bowler',
+};
 
 interface PlayerListProps {
   availablePlayers: CricketPlayer[];
@@ -15,6 +21,10 @@ export function PlayerList({ availablePlayers, onSelectPlayer, creditsUsed }: Pl
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+
+  const teams = useMemo(() => {
+    return [...new Set(availablePlayers.map((player) => player.team))].sort((a, b) => a.localeCompare(b));
+  }, [availablePlayers]);
 
   const filteredPlayers = useMemo(() => {
     return availablePlayers.filter((player) => {
@@ -65,7 +75,7 @@ export function PlayerList({ availablePlayers, onSelectPlayer, creditsUsed }: Pl
       <div className="mb-3">
         <p className="text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Team</p>
         <div className="flex gap-1 flex-wrap">
-          {['KK', 'LQ', 'IU', 'PZ', 'MS', 'QG'].map((team) => (
+          {teams.map((team) => (
             <button
               key={team}
               onClick={() => setSelectedTeam(selectedTeam === team ? null : team)}
@@ -108,7 +118,7 @@ export function PlayerList({ availablePlayers, onSelectPlayer, creditsUsed }: Pl
                 <Plus className="w-3.5 h-3.5 text-teal-600 flex-shrink-0 mt-0.5" />
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className={`${TEAM_COLORS[player.team]} text-white text-xs px-1.5 py-0.5 rounded font-medium`}>
+                <span className="bg-slate-900 text-white text-xs px-1.5 py-0.5 rounded font-medium">
                   {player.team}
                 </span>
                 <span className="text-xs font-bold text-slate-900">{player.credits}C</span>

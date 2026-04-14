@@ -1,8 +1,11 @@
-'use client';
+"use client";
 
-import { Trophy, TrendingUp, Zap, Gift, BarChart3, ArrowUpRight, ChevronDown } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck, ChevronDown, Database, Gift, Layers3, ShieldCheck, Trophy, TrendingUp, Wallet, Zap } from 'lucide-react';
 import { AppState } from '@/types/index';
 import { useState } from 'react';
+import { useIndexerSummary, useCurrentUserPassport } from '@/api/useIndexerData';
+import { useSiweSession } from '@/auth/useSiweSession';
+import { contractsConfigured } from '@/contracts/addresses';
 
 interface DashboardViewProps {
   state: AppState;
@@ -14,9 +17,16 @@ export function DashboardView({ state }: DashboardViewProps) {
     actions: true,
     tips: false,
   });
+  const summary = useIndexerSummary();
+  const passport = useCurrentUserPassport();
+  const auth = useSiweSession();
 
   const userRank = state.leaderboard.find((e) => e.isCurrentUser)?.rank || 0;
   const userPoints = state.leaderboard.find((e) => e.isCurrentUser)?.totalPoints || 0;
+  const indexerUrl = process.env.NEXT_PUBLIC_INDEXER_URL ?? 'http://localhost:42069';
+  const rpcUrl = process.env.NEXT_PUBLIC_WIREFLUID_RPC_URL ?? 'http://127.0.0.1:8545';
+  const passportStats = passport.data?.passport ?? null;
+  const passportBalance = passport.data?.balance ?? null;
 
   const earningsData = [
     { day: 'Mon', earnings: 245 },
@@ -43,6 +53,47 @@ export function DashboardView({ state }: DashboardViewProps) {
         <div className="mb-4 animate-fade-in-up">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-1">Welcome Back</h1>
           <p className="text-slate-600 text-sm">Your fantasy sports dashboard</p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-5 animate-fade-in-up" style={{ animationDelay: '25ms' }}>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
+            <div className="flex items-center gap-2 mb-3">
+              <Database className="w-4 h-4 text-teal-600" />
+              <h2 className="font-bold text-slate-900">Data Sources</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <SourceItem label="Indexer" value={indexerUrl} detail={summary.isError ? 'Unavailable' : 'Ponder API and audit history'} tone={summary.isError ? 'warn' : 'good'} />
+              <SourceItem label="RPC" value={rpcUrl} detail="Direct contract reads and writes" tone="good" />
+              <SourceItem label="Passport" value={passportStats ? `#${passportStats.tokenId}` : 'Not minted yet'} detail={passportStats ? `${passportStats.contestsEntered} entries · ${passportStats.contestsWon} wins` : 'Indexed from LegacyPassport'} tone={passportStats ? 'good' : 'muted'} />
+              <SourceItem label="Auth" value={auth.authenticated ? 'SIWE signed in' : 'Wallet only'} detail={auth.session?.address ?? 'Admin routes stay protected on-chain'} tone={auth.authenticated ? 'good' : 'muted'} />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-800 p-4 text-white shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck className="w-4 h-4 text-emerald-300" />
+              <h2 className="font-bold">Access</h2>
+            </div>
+            <p className="text-sm text-slate-300 mb-3">{state.userRole === 'ADMIN' ? 'Admin features are available for this wallet.' : 'Player mode. Admin actions require on-chain roles plus SIWE.'}</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <MiniStat label="Contracts" value={contractsConfigured ? 'Ready' : 'Missing'} />
+              <MiniStat label="Role" value={state.userRole} />
+              <MiniStat label="Session" value={auth.authenticated ? 'Signed in' : 'Unsigned'} />
+              <MiniStat label="Passport" value={passportBalance ? 'Indexed' : 'None'} />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <Layers3 className="w-4 h-4 text-blue-600" />
+              <h2 className="font-bold text-slate-900">What You See</h2>
+            </div>
+            <div className="space-y-2 text-sm text-slate-600">
+              <p>Live rankings and contest data come from the local Ponder indexer.</p>
+              <p>Squad edits and contest joins go directly through wagmi/viem to the contracts.</p>
+              <p>Legacy passport stats are indexed from on-chain events and shown after a wallet connects.</p>
+            </div>
+          </div>
         </div>
 
         {/* KPI Cards - Staggered Animation */}
@@ -244,6 +295,31 @@ export function DashboardView({ state }: DashboardViewProps) {
         {/* Spacer */}
         <div className="h-4" />
       </div>
+    </div>
+  );
+}
+
+function SourceItem({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: 'good' | 'warn' | 'muted' }) {
+  const toneClasses = {
+    good: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+    warn: 'border-amber-200 bg-amber-50 text-amber-900',
+    muted: 'border-slate-200 bg-slate-50 text-slate-900'
+  } as const;
+
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${toneClasses[tone]}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
+      <p className="mt-1 truncate font-semibold">{value}</p>
+      <p className="mt-1 text-xs opacity-80">{detail}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-white/10 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide text-slate-300">{label}</p>
+      <p className="font-semibold text-white">{value}</p>
     </div>
   );
 }

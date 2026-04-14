@@ -1,188 +1,180 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
-import { Gift, Loader, CheckCircle } from 'lucide-react';
-import { useEffect } from 'react';
+import { Award, CheckCircle2, Clock3, ShieldCheck, UserRound, Wallet } from 'lucide-react';
 import { contestManagerAbi } from '@wirefluid/contracts';
 import { contractAddresses } from '@/contracts/addresses';
 import { useCurrentUserPassport } from '@/api/useIndexerData';
 import { useArenaWriter } from '@/web3/useArenaWriter';
 import { formatWire } from '@/utils/arenaFormat';
+import { useSiweSession } from '@/auth/useSiweSession';
 
 interface RewardsViewProps {
   wireBalance: number;
   onClaimRewards: (amount: number) => void;
 }
 
-type ClaimState = 'IDLE' | 'LOADING' | 'AWAITING_SIGNATURE' | 'BROADCASTING' | 'CONFIRMED' | 'SUCCESS';
-
 export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
-  const [claimState, setClaimState] = useState<ClaimState>('IDLE');
-  const [displayBalance, setDisplayBalance] = useState(0);
-  const [confetti, setConfetti] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const passport = useCurrentUserPassport();
+  const auth = useSiweSession();
   const writer = useArenaWriter();
+
   const claimableReward = passport.data?.balance?.claimableReward ?? '0';
   const refundableAmount = passport.data?.balance?.refundableAmount ?? '0';
-
-  // Animate balance count-up
-  useEffect(() => {
-    if (claimState === 'SUCCESS') {
-      let current = displayBalance;
-      const target = wireBalance;
-      const increment = Math.ceil((target - current) / 20);
-
-      const timer = setInterval(() => {
-        current += increment;
-        if (current >= target) {
-          current = target;
-          clearInterval(timer);
-        }
-        setDisplayBalance(current);
-      }, 30);
-
-      return () => clearInterval(timer);
-    }
-  }, [claimState, wireBalance, displayBalance]);
+  const profile = passport.data?.passport ?? null;
 
   const handleClaimRewards = async () => {
-    setClaimState('AWAITING_SIGNATURE');
     await writer.write({
       address: contractAddresses.contestManager,
       abi: contestManagerAbi,
       functionName: 'claimReward'
     });
-    setClaimState('CONFIRMED');
-    setClaimState('SUCCESS');
-    setConfetti(true);
     onClaimRewards(Number(claimableReward));
-
-    setTimeout(() => {
-      setConfetti(false);
-      setTimeout(() => {
-        setClaimState('IDLE');
-        setDisplayBalance(0);
-      }, 1000);
-    }, 2000);
+    setStatusMessage('Reward claim submitted. Refresh in a few seconds to see updated indexed balances.');
   };
 
   const handleClaimRefund = async () => {
-    setClaimState('AWAITING_SIGNATURE');
     await writer.write({
       address: contractAddresses.contestManager,
       abi: contestManagerAbi,
       functionName: 'claimRefund'
     });
-    setClaimState('SUCCESS');
+    setStatusMessage('Refund claim submitted.');
   };
 
-  return (
-    <div className="flex-1 p-8 overflow-y-auto h-[calc(100vh-73px)]">
-      {/* Confetti Overlay */}
-      {confetti && (
-        <div className="fixed inset-0 z-50 pointer-events-none">
-          {Array.from({ length: 50 }).map((_, i) => (
-            <div
-              key={i}
-              className="fixed w-2 h-2 animate-bounce"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                backgroundColor: ['#10B981', '#F5A623', '#8B5CF6', '#2563EB'][Math.floor(Math.random() * 4)],
-                animation: `float ${2 + Math.random() * 1}s ease-out forwards`,
-              }}
-            />
-          ))}
-        </div>
-      )}
+  const growthScore = profile
+    ? Math.min(100, Number(profile.contestsEntered) * 4 + Number(profile.contestsWon) * 8)
+    : 0;
 
-      {claimState === 'IDLE' ? (
-        <>
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-[#0F1117] mb-2">Rewards Dashboard</h1>
-            <p className="text-[#4B5563]">Claim your fantasy sports winnings and rewards</p>
+  return (
+    <div className="flex-1 overflow-y-auto h-[calc(100vh-73px)] bg-white">
+      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6">
+        <header>
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Legacy Passport</p>
+          <h1 className="mt-1 text-3xl md:text-4xl font-bold text-slate-900">Player Profile & Rewards</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            Your passport follows your wallet across every match. Stats and claim history accumulate over time.
+          </p>
+        </header>
+
+        <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-4">
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5 md:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  <UserRound className="w-3.5 h-3.5" />
+                  Wallet Passport
+                </div>
+                <h2 className="mt-3 text-2xl font-bold text-slate-900">
+                  {profile ? `Passport #${profile.tokenId}` : 'No Passport Minted Yet'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  {profile ? 'This identity persists with your wallet and keeps growing each contest.' : 'Join your first contest to mint and start building this profile.'}
+                </p>
+              </div>
+
+              <div className="w-20 h-20 rounded-2xl bg-slate-900 text-white flex items-center justify-center">
+                <Award className="w-8 h-8" />
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard label="Contests Entered" value={profile ? profile.contestsEntered.toString() : '0'} />
+              <StatCard label="Winning Entries" value={profile ? profile.contestsWon.toString() : '0'} />
+              <StatCard label="Rewards Claimed" value={profile ? formatWire(profile.totalRewardsClaimed) : '0 WIRE'} />
+              <StatCard label="Profile Growth" value={`${growthScore}%`} />
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                <span>Progression Across Matches</span>
+                <span>{growthScore}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                <div className="h-full rounded-full bg-slate-900" style={{ width: `${growthScore}%` }} />
+              </div>
+            </div>
           </div>
 
-          {/* Main Reward Card */}
-          <div className="bg-gradient-to-br from-[#F5A623]/20 to-[#10B981]/20 rounded-xl border border-[#F5A623]/30 p-12 mb-8 text-center">
-            <Gift className="w-16 h-16 text-[#F5A623] mx-auto mb-6" />
-            <p className="text-[#4B5563] text-lg mb-4">Your Pending Rewards</p>
-            <div className="flex items-baseline justify-center gap-2 mb-8">
-              <span className="text-6xl font-black text-[#0F1117] tabular-nums">{formatWire(claimableReward)}</span>
+          <aside className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Authorization</h3>
+            <p className="mt-2 font-semibold text-slate-900">{auth.authenticated ? 'SIWE Session Active' : 'Wallet-Only Mode'}</p>
+            <p className="mt-1 text-xs text-slate-500 break-all">{auth.session?.address ?? 'Sign in to access admin APIs'}</p>
+            <button
+              onClick={async () => {
+                if (auth.authenticated) {
+                  await auth.signOut();
+                } else {
+                  await auth.signIn();
+                }
+              }}
+              className="mt-4 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+            >
+              {auth.authenticated ? 'Sign Out' : 'Sign In'}
+            </button>
+          </aside>
+        </section>
+
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wide">
+              <Wallet className="w-4 h-4" />
+              Claimable Reward
             </div>
-            <p className="text-sm text-[#4B5563] mb-8 max-w-md mx-auto">Rewards and refunds are pull-based on-chain balances.</p>
+            <p className="mt-3 text-2xl font-bold text-slate-900">{formatWire(claimableReward)}</p>
             <button
               onClick={handleClaimRewards}
               disabled={BigInt(claimableReward) === 0n || writer.isSubmitting}
-              className="mx-auto px-8 py-4 bg-[#10B981] hover:bg-[#059669] text-white font-bold rounded-lg transition-all disabled:opacity-50"
+              className="mt-4 w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
             >
-              Claim Rewards
+              Claim Reward
             </button>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wide">
+              <Clock3 className="w-4 h-4" />
+              Refundable Balance
+            </div>
+            <p className="mt-3 text-2xl font-bold text-slate-900">{formatWire(refundableAmount)}</p>
             <button
               onClick={handleClaimRefund}
               disabled={BigInt(refundableAmount) === 0n || writer.isSubmitting}
-              className="ml-3 px-8 py-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-lg transition-all disabled:opacity-50"
+              className="mt-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
             >
-              Claim Refunds ({formatWire(refundableAmount)})
+              Claim Refund
             </button>
-            {writer.error && <p className="mt-4 text-sm text-red-600">{writer.error}</p>}
           </div>
 
-          {/* Recent Rewards */}
-          <div>
-            <h2 className="text-lg font-bold text-[#0F1117] mb-4">Passport Stats</h2>
-            <div className="space-y-3">
-              {[
-                { label: 'Contests entered', amount: passport.data?.passport?.contestsEntered ?? 0 },
-                { label: 'Winning entries', amount: passport.data?.passport?.contestsWon ?? 0 },
-                { label: 'Total rewards claimed', amount: formatWire(passport.data?.passport?.totalRewardsClaimed ?? '0') },
-              ].map((reward, idx) => (
-                <div key={idx} className="bg-white border border-[#E5E7EB] rounded-lg p-4 flex items-center justify-between hover:shadow-md transition-all">
-                  <span className="text-[#0F1117] font-medium">{reward.label}</span>
-                  <span className="font-bold text-[#F5A623] tabular-nums">{reward.amount}</span>
-                </div>
-              ))}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wide">
+              <ShieldCheck className="w-4 h-4" />
+              Balance Context
             </div>
-          </div>
-        </>
-      ) : claimState === 'LOADING' ? (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <Loader className="w-12 h-12 text-[#10B981] animate-spin mx-auto mb-4" />
-            <p className="text-[#0F1117] font-bold">Processing Claim...</p>
-            <p className="text-[#4B5563] text-sm mt-2">Please wait</p>
-          </div>
-        </div>
-      ) : claimState === 'SUCCESS' ? (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center bg-white rounded-xl border border-[#E5E7EB] p-12 max-w-md">
-            <CheckCircle className="w-16 h-16 text-[#10B981] mx-auto mb-6" />
-            <h2 className="text-2xl font-bold text-[#0F1117] mb-2">Rewards Claimed!</h2>
-            <div className="flex items-baseline justify-center gap-2 my-8">
-              <span className="text-[#F5A623] text-2xl">◈</span>
-              <span className="text-4xl font-black text-[#0F1117] tabular-nums">{displayBalance.toLocaleString()}</span>
-            </div>
-            <p className="text-[#4B5563] text-sm">Successfully added to your wallet</p>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center bg-white rounded-xl border border-[#E5E7EB] p-12 max-w-md">
-            <Loader className="w-12 h-12 text-[#2563EB] animate-spin mx-auto mb-6" />
-            <h2 className="text-xl font-bold text-[#0F1117] mb-4">
-              {claimState === 'AWAITING_SIGNATURE' && 'Awaiting Signature'}
-              {claimState === 'BROADCASTING' && 'Broadcasting Transaction'}
-              {claimState === 'CONFIRMED' && 'Transaction Confirmed'}
-            </h2>
-            <p className="text-[#4B5563] text-sm">
-              {claimState === 'AWAITING_SIGNATURE' && 'Please confirm in your wallet'}
-              {claimState === 'BROADCASTING' && 'Processing on blockchain...'}
-              {claimState === 'CONFIRMED' && 'Finalizing...'}
+            <p className="mt-3 text-sm text-slate-600">
+              Claim states are indexed and then settled by on-chain contract calls. Keep Anvil and indexer running for accurate local values.
             </p>
+            <p className="mt-3 text-xs text-slate-500">UI wallet balance: {wireBalance.toLocaleString()} WIRE</p>
           </div>
-        </div>
-      )}
+        </section>
+
+        {(statusMessage || writer.error) && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-600" />
+            <p>{writer.error ?? statusMessage}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
     </div>
   );
 }

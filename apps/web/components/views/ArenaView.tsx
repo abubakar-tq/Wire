@@ -1,12 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { AlertCircle, Sparkles, Lock, Trash2, ChevronDown } from 'lucide-react';
-import { CricketPlayer, Squad } from '@/types/index';
-import { PlayerList } from '@/components/PlayerList';
-import { CricketPitch } from '@/components/CricketPitch';
-import { NFTPreviewCard } from '@/components/NFTPreviewCard';
+import { useMemo, useState } from 'react';
+import { AlertCircle, ChevronDown, Lock, Plus, Sparkles, Trash2 } from 'lucide-react';
+import type { CricketPlayer, Squad } from '@/types/index';
 import type { IndexedContest } from '@/api/indexerClient';
+import { PlayerList } from '@/components/PlayerList';
 import { formatWire } from '@/utils/arenaFormat';
 
 interface ArenaViewProps {
@@ -15,10 +13,13 @@ interface ArenaViewProps {
   creditsUsed: number;
   isSquadValid: boolean;
   matchStatus: string;
+  activeMatchId?: string;
+  activeMatchLabel?: string;
   onAddPlayer: (player: CricketPlayer) => void;
   onRemovePlayer: (playerId: string) => void;
   onSetCaptain: (playerId: string) => void;
   onSetViceCaptain: (playerId: string) => void;
+  onClearSquad?: () => void;
   selectedContest?: IndexedContest | null;
   onJoinContest?: () => Promise<void>;
   isJoining?: boolean;
@@ -32,361 +33,294 @@ export function ArenaView({
   creditsUsed,
   isSquadValid,
   matchStatus,
+  activeMatchId,
+  activeMatchLabel,
   onAddPlayer,
   onRemovePlayer,
   onSetCaptain,
   onSetViceCaptain,
+  onClearSquad,
   selectedContest,
   onJoinContest,
   isJoining = false,
   txHash,
-  txError,
+  txError
 }: ArenaViewProps) {
-  const [showNFTPreview, setShowNFTPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expandedSquad, setExpandedSquad] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showPlayersOnMobile, setShowPlayersOnMobile] = useState(false);
+
   const creditsAvailable = 100 - creditsUsed;
 
-  const handleMintNFT = async () => {
+  const grouped = useMemo(
+    () => ({
+      WK: squad.players.filter((player) => player.role === 'WK'),
+      BAT: squad.players.filter((player) => player.role === 'BAT'),
+      AR: squad.players.filter((player) => player.role === 'AR'),
+      BOWL: squad.players.filter((player) => player.role === 'BOWL')
+    }),
+    [squad.players]
+  );
+
+  const openConfirm = () => {
     if (!isSquadValid) {
-      setError('Squad must have 11 players, C & VC assigned, and be within 100 credits');
-      setTimeout(() => setError(null), 3000);
+      setError('Squad must include 11 players with valid captain and vice-captain.');
+      setTimeout(() => setError(null), 2500);
       return;
     }
-
-    setShowNFTPreview(true);
+    setShowConfirm(true);
   };
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden h-[calc(100vh-73px)] gap-0 bg-white">
-      {/* Left: Player List - Hidden on mobile, shown on lg screens */}
-      <div className="hidden lg:block lg:w-80 xl:w-96 bg-white border-r border-slate-200 overflow-y-auto">
+    <div className="flex-1 grid grid-cols-1 xl:grid-cols-[22rem_minmax(0,1fr)] h-[calc(100vh-73px)] bg-white">
+      <aside className="hidden xl:block border-r border-slate-200 overflow-y-auto">
         <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} creditsUsed={creditsUsed} />
-      </div>
+      </aside>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Player List Toggle */}
-        <div className="lg:hidden px-4 py-3 border-b border-slate-200 bg-slate-50">
-          <button 
-            onClick={() => setExpandedSquad(!expandedSquad)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-slate-200 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition-colors"
-          >
-            <span>Available Players</span>
-            <ChevronDown className={`w-4 h-4 transition-transform ${expandedSquad ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
+      <section className="overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white p-5 md:p-6">
+            <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Squad Builder</p>
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">Build Match-Wise Squads</h1>
+                <p className="text-sm text-slate-600 mt-1">
+                  {activeMatchLabel ? `You are editing match #${activeMatchLabel}` : 'Select a contest to start.'}
+                </p>
+              </div>
 
-        {/* Mobile Expanded Player List */}
-        {expandedSquad && (
-          <div className="lg:hidden border-b border-slate-200 bg-white overflow-y-auto max-h-96">
-            <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} creditsUsed={creditsUsed} />
+              <div className="grid grid-cols-3 gap-2">
+                <Metric label="Players" value={`${squad.players.length}/11`} tone={squad.players.length === 11 ? 'good' : 'normal'} />
+                <Metric label="Credits" value={`${creditsUsed}/100`} tone={creditsUsed <= 100 ? 'normal' : 'warn'} />
+                <Metric label="State" value={isSquadValid ? 'Ready' : 'Draft'} tone={isSquadValid ? 'good' : 'normal'} />
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="w-full max-w-7xl mx-auto p-4 md:p-6">
-            {/* Error Message */}
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 animate-slide-down shadow-sm text-sm">
-                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                <p className="text-red-700">{error}</p>
-              </div>
-            )}
-
-            {/* Squad Status - Compact Cards */}
-            <div className="grid grid-cols-3 gap-2 md:gap-3 mb-4">
-              {[
-                { label: 'Squad', value: squad.players.length, max: 11, color: 'teal', icon: '👥' },
-                { label: 'Credits', value: creditsUsed, max: 100, color: 'blue', icon: '💎', subtext: `${creditsAvailable}` },
-                { label: 'Status', value: isSquadValid ? 'Ready' : 'Incomplete', color: isSquadValid ? 'emerald' : 'slate', icon: isSquadValid ? '✓' : '○' },
-              ].map((stat, idx) => (
-                <div
-                  key={idx}
-                  className={`rounded-lg p-3 border transition-smooth text-sm ${
-                    stat.label === 'Status'
-                      ? isSquadValid
-                        ? 'bg-emerald-50 border-emerald-200'
-                        : 'bg-slate-50 border-slate-200'
-                      : 'bg-white border-slate-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-600 font-semibold">{stat.icon}</span>
-                    <span className="text-xs text-slate-600 uppercase font-semibold">{stat.label}</span>
-                  </div>
-                  <p className={`text-lg font-bold text-${stat.color}-700`}>{stat.value}</p>
-                  {stat.max && <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1">
-                    <div className={`h-full rounded-full bg-${stat.color}-600`} style={{ width: `${(stat.value / stat.max) * 100}%` }} />
-                  </div>}
-                  {stat.subtext && <p className="text-xs text-slate-600 mt-1">{stat.subtext} left</p>}
-                </div>
-              ))}
-            </div>
-
-            {/* Match Locked Warning */}
-            {matchStatus === 'LOCKED' && (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2 text-sm">
-                <Lock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-amber-900"><span className="font-semibold">Match Locked</span> — No further changes allowed</p>
-              </div>
-            )}
-
-            {/* Pitch and Squad Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-              {/* Pitch Visualization - Takes 2 cols on large screens */}
-              <div className="lg:col-span-2">
-                <div className="bg-gradient-to-br from-teal-50 to-emerald-50 rounded-lg border border-teal-200 p-4">
-                  <div className="aspect-video max-w-2xl mx-auto relative bg-white rounded-lg border-2 border-dashed border-teal-300/40 overflow-hidden shadow-sm">
-                    {/* Cricket Field */}
-                    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 250">
-                      <ellipse cx="200" cy="125" rx="150" ry="80" fill="none" stroke="#14B8A6" strokeWidth="2" opacity="0.25" />
-                      <line x1="200" y1="30" x2="200" y2="220" stroke="#14B8A6" strokeWidth="1" opacity="0.15" />
-                      <circle cx="200" cy="125" r="30" fill="none" stroke="#14B8A6" strokeWidth="1" opacity="0.15" />
-                    </svg>
-
-                    {/* Player Positions - Properly sized */}
-                    <div className="relative w-full h-full flex flex-col justify-between p-2">
-                      {/* Top: WK */}
-                      {squad.players.filter(p => p.role === 'WK').length > 0 && (
-                        <div className="flex justify-center gap-1">
-                          {squad.players.filter(p => p.role === 'WK').slice(0, 2).map((p) => (
-                            <div key={p.id} className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center border border-white shadow-sm" title={p.name}>
-                              {p.name.charAt(0)}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Middle rows */}
-                      <div className="flex justify-between items-center px-1">
-                        {/* Left: BAT */}
-                        {squad.players.filter(p => p.role === 'BAT').length > 0 && (
-                          <div className="flex flex-col gap-1">
-                            {squad.players.filter(p => p.role === 'BAT').slice(0, 2).map((p) => (
-                              <div key={p.id} className="w-5 h-5 rounded-full bg-amber-600 text-white text-xs font-bold flex items-center justify-center border border-white shadow-sm" title={p.name}>
-                                {p.name.charAt(0)}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Center: AR */}
-                        {squad.players.filter(p => p.role === 'AR').length > 0 && (
-                          <div className="flex flex-col gap-1">
-                            {squad.players.filter(p => p.role === 'AR').slice(0, 3).map((p) => (
-                              <div key={p.id} className="w-5 h-5 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center border border-white shadow-sm" title={p.name}>
-                                {p.name.charAt(0)}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Right: BOWL */}
-                        {squad.players.filter(p => p.role === 'BOWL').length > 0 && (
-                          <div className="flex flex-col gap-1">
-                            {squad.players.filter(p => p.role === 'BOWL').slice(0, 2).map((p) => (
-                              <div key={p.id} className="w-5 h-5 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center border border-white shadow-sm" title={p.name}>
-                                {p.name.charAt(0)}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Bottom: Extra bowlers */}
-                      {squad.players.filter(p => p.role === 'BOWL').length > 2 && (
-                        <div className="flex justify-center gap-1">
-                          {squad.players.filter(p => p.role === 'BOWL').slice(2, 4).map((p) => (
-                            <div key={p.id} className="w-5 h-5 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center border border-white shadow-sm" title={p.name}>
-                              {p.name.charAt(0)}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* NFT Preview and Actions - Takes 1 col */}
-              <div className="space-y-4">
-                <NFTPreviewCard squadId="#2841" squadName="My Arena" captainName={squad.players.find(p => p.id === squad.captainId)?.name || 'N/A'} playersCount={squad.players.length} />
-
-                {selectedContest && (
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Contest</span>
-                      <span className="font-semibold text-slate-900">#{selectedContest.contestId}</span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-slate-600">Entry fee</span>
-                      <span className="font-semibold text-slate-900">{formatWire(selectedContest.entryFee)}</span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-slate-600">Entries</span>
-                      <span className="font-semibold text-slate-900">{selectedContest.totalEntries}/{selectedContest.maxEntries}</span>
-                    </div>
-                  </div>
-                )}
-                
-                <button
-                  onClick={handleMintNFT}
-                  disabled={!isSquadValid || matchStatus === 'LOCKED' || !selectedContest || isJoining}
-                  className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-smooth flex items-center justify-center gap-2 ${
-                    isSquadValid && matchStatus !== 'LOCKED' && selectedContest && !isJoining
-                      ? 'bg-teal-600 hover:bg-teal-700 shadow-sm hover:shadow-md active:scale-95'
-                      : 'bg-slate-300 cursor-not-allowed'
-                  }`}
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {isJoining ? 'Joining Contest...' : selectedContest ? 'Join Contest' : 'No Open Contest'}
-                </button>
-
-                {txHash && <p className="text-xs text-slate-600 break-all">Submitted: {txHash}</p>}
-                {txError && <p className="text-xs text-red-600">{txError}</p>}
-              </div>
-            </div>
-
-            {/* Squad Players List - Compact */}
-            {squad.players.length > 0 && (
-              <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                  <h3 className="font-semibold text-slate-900 text-sm">Selected Squad</h3>
-                  <span className="text-xs text-slate-600">{squad.players.length} players</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs md:text-sm">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-semibold text-slate-700">Player</th>
-                        <th className="px-3 py-2 text-center font-semibold text-slate-700 hidden sm:table-cell">Role</th>
-                        <th className="px-3 py-2 text-center font-semibold text-slate-700">Cred</th>
-                        <th className="px-3 py-2 text-center font-semibold text-slate-700">C/VC</th>
-                        <th className="px-3 py-2 text-center font-semibold text-slate-700">Del</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {squad.players.map((player) => (
-                        <tr key={player.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-3 py-2">
-                            <p className="font-semibold text-slate-900">{player.name}</p>
-                            <p className="text-xs text-slate-600">{player.team}</p>
-                          </td>
-                          <td className="px-3 py-2 text-center hidden sm:table-cell">
-                            <span className="text-xs font-medium px-2 py-1 bg-slate-100 rounded text-slate-700">{['WK', 'BAT', 'AR', 'BOWL'].includes(player.role) ? player.role : 'N/A'}</span>
-                          </td>
-                          <td className="px-3 py-2 text-center font-bold text-slate-900">{player.credits}</td>
-                          <td className="px-3 py-2 text-center">
-                            <div className="flex justify-center gap-1">
-                              <button
-                                onClick={() => onSetCaptain(player.id)}
-                                disabled={matchStatus === 'LOCKED'}
-                                className={`p-1 rounded text-xs font-bold ${
-                                  squad.captainId === player.id
-                                    ? 'bg-amber-500 text-white'
-                                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                                } ${matchStatus === 'LOCKED' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                title="Captain"
-                              >
-                                C
-                              </button>
-                              <button
-                                onClick={() => onSetViceCaptain(player.id)}
-                                disabled={matchStatus === 'LOCKED'}
-                                className={`p-1 rounded text-xs font-bold ${
-                                  squad.viceCaptainId === player.id
-                                    ? 'bg-purple-500 text-white'
-                                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                                } ${matchStatus === 'LOCKED' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                title="Vice Captain"
-                              >
-                                VC
-                              </button>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <button
-                              onClick={() => onRemovePlayer(player.id)}
-                              disabled={matchStatus === 'LOCKED'}
-                              className={`p-1 rounded text-red-600 hover:bg-red-50 transition-colors ${
-                                matchStatus === 'LOCKED' ? 'opacity-50 cursor-not-allowed' : ''
-                              }`}
-                              title="Remove"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {squad.players.length === 0 && (
-              <div className="text-center py-12 bg-slate-50 rounded-lg border border-slate-200">
-                <p className="text-slate-600 text-sm">No players selected yet. Choose players from the left to build your squad.</p>
-              </div>
-            )}
+          <div className="xl:hidden">
+            <button
+              onClick={() => setShowPlayersOnMobile((prev) => !prev)}
+              className="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900"
+            >
+              <span>Available Players</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showPlayersOnMobile ? 'rotate-180' : ''}`} />
+            </button>
           </div>
-        </div>
-      </div>
 
-      {/* NFT Mint Modal */}
-      {showNFTPreview && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-lg max-w-md w-full p-6 md:p-8 shadow-lg animate-scale-in">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-5 h-5 text-teal-600" />
-              <h2 className="text-xl md:text-2xl font-bold text-slate-900">Squad NFT Ready</h2>
+          {showPlayersOnMobile ? (
+            <div className="xl:hidden rounded-xl border border-slate-200 overflow-hidden">
+              <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} creditsUsed={creditsUsed} />
             </div>
-            <p className="text-slate-600 text-sm mb-6">Your squad is ready to mint as a blockchain asset</p>
+          ) : null}
 
-            <div className="bg-gradient-to-br from-teal-50 to-blue-50 rounded-lg p-5 mb-6 border border-teal-200 space-y-3 text-sm">
-              <div className="text-center">
-                <p className="text-xs text-slate-600 font-semibold uppercase tracking-wide">Squad ID</p>
-                <p className="text-4xl font-black text-slate-900">#2841</p>
-              </div>
+          {matchStatus === 'LOCKED' ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center gap-2">
+              <Lock className="w-4 h-4" />
+              <span>Match locked: squad can be reviewed but not edited.</span>
+            </div>
+          ) : null}
 
-              <div className="bg-white rounded-lg p-3 border-2 border-dashed border-teal-300 text-center space-y-1">
-                <p className="text-xs text-slate-600 uppercase font-semibold">Captain</p>
-                <p className="font-bold text-slate-900">{squad.players.find(p => p.id === squad.captainId)?.name || 'N/A'}</p>
-              </div>
+          {error ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              <span>{error}</span>
+            </div>
+          ) : null}
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-slate-50 rounded p-2 text-center">
-                  <p className="text-xs text-slate-600">Players</p>
-                  <p className="font-bold text-slate-900">{squad.players.length}</p>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-5">
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold text-slate-900">Current Match Squad</h2>
+                    <p className="text-xs text-slate-500">Saved separately for match #{activeMatchId ?? 'n/a'}</p>
+                  </div>
+                  <button
+                    onClick={onClearSquad}
+                    disabled={squad.players.length === 0}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    Clear
+                  </button>
                 </div>
-                <div className="bg-slate-50 rounded p-2 text-center">
-                  <p className="text-xs text-slate-600">Credits</p>
-                  <p className="font-bold text-slate-900">{creditsUsed}/100</p>
+
+                <div className="p-4 space-y-3">
+                  <RoleGroup title="Wicket Keepers" players={grouped.WK} squad={squad} matchStatus={matchStatus} onSetCaptain={onSetCaptain} onSetViceCaptain={onSetViceCaptain} onRemovePlayer={onRemovePlayer} />
+                  <RoleGroup title="Batters" players={grouped.BAT} squad={squad} matchStatus={matchStatus} onSetCaptain={onSetCaptain} onSetViceCaptain={onSetViceCaptain} onRemovePlayer={onRemovePlayer} />
+                  <RoleGroup title="All-Rounders" players={grouped.AR} squad={squad} matchStatus={matchStatus} onSetCaptain={onSetCaptain} onSetViceCaptain={onSetViceCaptain} onRemovePlayer={onRemovePlayer} />
+                  <RoleGroup title="Bowlers" players={grouped.BOWL} squad={squad} matchStatus={matchStatus} onSetCaptain={onSetCaptain} onSetViceCaptain={onSetViceCaptain} onRemovePlayer={onRemovePlayer} />
                 </div>
               </div>
+
+              {squad.players.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                  <Plus className="w-6 h-6 mx-auto mb-2 text-slate-400" />
+                  <p className="font-semibold text-slate-700">No players selected for this match</p>
+                  <p className="text-sm text-slate-500">Open the player panel and add your first pick.</p>
+                </div>
+              ) : null}
             </div>
 
-            <div className="flex gap-2">
+            <aside className="space-y-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 text-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Contest</p>
+                <p className="text-lg font-bold text-slate-900">{selectedContest ? `#${selectedContest.contestId}` : 'No Open Contest'}</p>
+                <DataRow label="Match" value={selectedContest ? `#${selectedContest.matchId}` : '—'} />
+                <DataRow label="Entry fee" value={selectedContest ? formatWire(selectedContest.entryFee) : '—'} />
+                <DataRow label="Entries" value={selectedContest ? `${selectedContest.totalEntries}/${selectedContest.maxEntries}` : '—'} />
+                <DataRow label="Credits left" value={`${creditsAvailable}`} />
+              </div>
+
               <button
-                onClick={() => setShowNFTPreview(false)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-900 rounded-lg hover:bg-slate-50 font-semibold text-sm transition-colors"
+                onClick={openConfirm}
+                disabled={!isSquadValid || matchStatus === 'LOCKED' || !selectedContest || isJoining}
+                className={`w-full rounded-xl px-4 py-3 font-semibold text-white ${
+                  isSquadValid && matchStatus !== 'LOCKED' && selectedContest && !isJoining
+                    ? 'bg-slate-900 hover:bg-slate-800'
+                    : 'bg-slate-300 cursor-not-allowed'
+                }`}
+              >
+                {isJoining ? 'Joining Contest...' : 'Review And Join'}
+              </button>
+
+              {txHash ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 break-all">Tx: {txHash}</div> : null}
+              {txError ? <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{txError}</div> : null}
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      {showConfirm ? (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-5 h-5 text-slate-900" />
+              <h2 className="text-xl font-bold text-slate-900">Confirm Contest Entry</h2>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
+              <DataRow label="Match" value={`#${activeMatchLabel ?? activeMatchId ?? 'n/a'}`} />
+              <DataRow label="Players" value={`${squad.players.length}/11`} />
+              <DataRow label="Captain" value={squad.players.find((p) => p.id === squad.captainId)?.name ?? 'Not selected'} />
+              <DataRow label="Vice captain" value={squad.players.find((p) => p.id === squad.viceCaptainId)?.name ?? 'Not selected'} />
+              <DataRow label="Contest" value={selectedContest ? `#${selectedContest.contestId}` : 'Unavailable'} />
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
               >
                 Cancel
               </button>
               <button
                 onClick={async () => {
                   if (onJoinContest) await onJoinContest();
-                  setShowNFTPreview(false);
+                  setShowConfirm(false);
                 }}
                 disabled={!onJoinContest || isJoining}
-                className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 font-semibold text-sm transition-colors"
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
               >
                 {isJoining ? 'Waiting...' : 'Confirm Join'}
               </button>
             </div>
           </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Metric({ label, value, tone }: { label: string; value: string; tone: 'normal' | 'good' | 'warn' }) {
+  const toneMap = {
+    normal: 'bg-white border-slate-200 text-slate-900',
+    good: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    warn: 'bg-amber-50 border-amber-200 text-amber-700'
+  } as const;
+
+  return (
+    <div className={`rounded-xl border px-3 py-2 ${toneMap[tone]}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{label}</p>
+      <p className="text-base font-bold mt-1">{value}</p>
+    </div>
+  );
+}
+
+function DataRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-slate-600">{label}</span>
+      <span className="font-semibold text-slate-900 text-right">{value}</span>
+    </div>
+  );
+}
+
+function RoleGroup({
+  title,
+  players,
+  squad,
+  matchStatus,
+  onSetCaptain,
+  onSetViceCaptain,
+  onRemovePlayer
+}: {
+  title: string;
+  players: CricketPlayer[];
+  squad: Squad;
+  matchStatus: string;
+  onSetCaptain: (playerId: string) => void;
+  onSetViceCaptain: (playerId: string) => void;
+  onRemovePlayer: (playerId: string) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <h3 className="font-semibold text-slate-900">{title}</h3>
+        <span className="text-xs text-slate-500">{players.length}</span>
+      </div>
+
+      {players.length === 0 ? (
+        <p className="px-3 py-3 text-sm text-slate-500">No players selected.</p>
+      ) : (
+        <div className="divide-y divide-slate-200">
+          {players.map((player) => {
+            const captain = squad.captainId === player.id;
+            const viceCaptain = squad.viceCaptainId === player.id;
+            return (
+              <div key={player.id} className="px-3 py-2 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
+                  {player.name.slice(0, 1)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-slate-900 truncate">{player.name}</p>
+                  <p className="text-xs text-slate-500">{player.team} • {player.credits} credits</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => onSetCaptain(player.id)}
+                    disabled={matchStatus === 'LOCKED'}
+                    className={`rounded px-2 py-1 text-xs font-semibold ${captain ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700'}`}
+                  >
+                    C
+                  </button>
+                  <button
+                    onClick={() => onSetViceCaptain(player.id)}
+                    disabled={matchStatus === 'LOCKED'}
+                    className={`rounded px-2 py-1 text-xs font-semibold ${viceCaptain ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-700'}`}
+                  >
+                    VC
+                  </button>
+                  <button
+                    onClick={() => onRemovePlayer(player.id)}
+                    disabled={matchStatus === 'LOCKED'}
+                    className="rounded p-1 text-red-600 hover:bg-red-50"
+                    aria-label={`Remove ${player.name}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

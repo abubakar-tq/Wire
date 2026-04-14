@@ -2,7 +2,23 @@
 
 import { Trash2, Crown, Lock } from 'lucide-react';
 import { CricketPlayer } from '@/types/index';
-import { TEAM_COLORS, ROLE_LABELS } from '@/lib/mock-data';
+
+const ROLE_LABELS: Record<string, string> = {
+  WK: 'Wicket Keeper',
+  BAT: 'Batter',
+  AR: 'All-rounder',
+  BOWL: 'Bowler',
+};
+
+const TEAM_BADGES = ['bg-teal-700', 'bg-blue-700', 'bg-emerald-700', 'bg-slate-800'];
+
+function teamBadgeClass(team: string) {
+  let hash = 0;
+  for (let index = 0; index < team.length; index += 1) {
+    hash += team.charCodeAt(index);
+  }
+  return TEAM_BADGES[hash % TEAM_BADGES.length];
+}
 
 interface CricketPitchProps {
   players: CricketPlayer[];
@@ -64,7 +80,7 @@ export function CricketPitch({
                     {roleGroups.WK.map((player) => (
                       <div
                         key={player.id}
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs border border-white shadow-sm ${TEAM_COLORS[player.team] || 'bg-blue-600'}`}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs border border-white shadow-sm ${teamBadgeClass(player.team)}`}
                         title={player.name}
                       >
                         {player.name.charAt(0)}
@@ -83,7 +99,7 @@ export function CricketPitch({
                     {roleGroups.BAT.slice(0, 3).map((player) => (
                       <div
                         key={player.id}
-                        className={`w-5 h-5 rounded-full flex items-center justify-center text-white font-bold text-xs border border-white shadow-sm ${TEAM_COLORS[player.team] || 'bg-amber-600'}`}
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-white font-bold text-xs border border-white shadow-sm ${teamBadgeClass(player.team)}`}
                         title={player.name}
                       >
                         {player.name.charAt(0)}
@@ -99,7 +115,7 @@ export function CricketPitch({
                     {roleGroups.AR.slice(0, 3).map((player) => (
                       <div
                         key={player.id}
-                        className={`w-5 h-5 rounded-full flex items-center justify-center text-white font-bold text-xs border border-white shadow-sm ${TEAM_COLORS[player.team] || 'bg-purple-600'}`}
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-white font-bold text-xs border border-white shadow-sm ${teamBadgeClass(player.team)}`}
                         title={player.name}
                       >
                         {player.name.charAt(0)}
@@ -117,7 +133,7 @@ export function CricketPitch({
                     {roleGroups.BOWL.slice(0, 5).map((player) => (
                       <div
                         key={player.id}
-                        className={`w-5 h-5 rounded-full flex items-center justify-center text-white font-bold text-xs border border-white shadow-sm ${TEAM_COLORS[player.team] || 'bg-red-600'}`}
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-white font-bold text-xs border border-white shadow-sm ${teamBadgeClass(player.team)}`}
                         title={player.name}
                       >
                         {player.name.charAt(0)}
