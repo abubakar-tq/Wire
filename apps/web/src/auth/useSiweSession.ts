@@ -32,7 +32,7 @@ export function useSiweSession() {
 
       const nonceResponse = await fetch("/api/auth/nonce", { cache: "no-store" });
       if (!nonceResponse.ok) {
-        throw new Error("Unable to create SIWE nonce");
+        throw new Error("Unable to start admin verification");
       }
 
       const { nonce } = (await nonceResponse.json()) as { nonce: string };
@@ -61,7 +61,7 @@ export function useSiweSession() {
 
       if (!verifyResponse.ok) {
         const payload = (await verifyResponse.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(payload?.error ?? "SIWE verification failed");
+        throw new Error(payload?.error ?? "Admin verification failed");
       }
 
       return (await verifyResponse.json()) as SessionResponse;

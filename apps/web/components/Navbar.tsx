@@ -3,13 +3,10 @@
 import { useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { ShieldCheck, Zap } from 'lucide-react';
-import { useChainId } from 'wagmi';
 import type { AppState, ViewType } from '@/types/index';
 import type { RoleChecks } from '@/web3/useRoleChecks';
-import { contractsConfigured } from '@/contracts/addresses';
 import { shortAddress } from '@/utils/arenaFormat';
 import { useSiweSession } from '@/auth/useSiweSession';
-import { configuredChainId } from '@/chains/wireFluidTestnet';
 
 interface NavbarProps {
   state: AppState;
@@ -19,7 +16,7 @@ interface NavbarProps {
 
 const PLAYER_VIEWS: Array<{ label: string; view: ViewType }> = [
   { label: 'Dashboard', view: 'DASHBOARD' },
-  { label: 'Squads', view: 'ARENA' },
+  { label: 'Matches', view: 'ARENA' },
   { label: 'Leaderboard', view: 'LEADERBOARD' },
   { label: 'Rewards', view: 'REWARDS' }
 ];
@@ -27,10 +24,20 @@ const PLAYER_VIEWS: Array<{ label: string; view: ViewType }> = [
 export function Navbar({ state, roles, onViewChange }: NavbarProps) {
   const [authError, setAuthError] = useState<string | null>(null);
   const auth = useSiweSession();
-  const chainId = useChainId();
 
   const hasAdminAccess = roles.admin || roles.operator || roles.scorePublisher || roles.treasury;
-  const wrongChain = chainId !== configuredChainId;
+
+  const openAdmin = async () => {
+    setAuthError(null);
+    try {
+      if (!auth.authenticated) {
+        await auth.signIn();
+      }
+      onViewChange('ADMIN_DASHBOARD');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Admin verification failed');
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -65,7 +72,7 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
             ))}
             {hasAdminAccess ? (
               <button
-                onClick={() => onViewChange('ADMIN_DASHBOARD')}
+                onClick={openAdmin}
                 className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
                   ['ADMIN_DASHBOARD', 'PROTOCOL', 'MATCH', 'SCORE', 'TREASURY'].includes(state.activeView)
                     ? 'bg-slate-900 text-white'
@@ -78,40 +85,12 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
           </nav>
 
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="hidden md:flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <span className={`w-2 h-2 rounded-full ${wrongChain ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-              <span className="text-xs font-semibold text-slate-700">
-                {wrongChain ? `Wrong chain (need ${configuredChainId})` : `Chain ${configuredChainId}`}
-              </span>
-            </div>
-
-            <div className="hidden md:flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <span className={`w-2 h-2 rounded-full ${contractsConfigured ? 'bg-emerald-500' : 'bg-red-400'}`} />
-              <span className="text-xs font-semibold text-slate-700">{contractsConfigured ? 'Contracts set' : 'Contracts missing'}</span>
-            </div>
-
-            <button
-              onClick={async () => {
-                setAuthError(null);
-                try {
-                  if (auth.authenticated) {
-                    await auth.signOut();
-                  } else {
-                    await auth.signIn();
-                  }
-                } catch (error) {
-                  setAuthError(error instanceof Error ? error.message : 'Authentication failed');
-                }
-              }}
-              className={`hidden md:inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold border ${
-                auth.authenticated
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : 'border-slate-200 bg-white text-slate-700'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              {auth.authenticated ? 'SIWE Signed In' : 'SIWE Sign In'}
-            </button>
+            {hasAdminAccess && auth.authenticated ? (
+              <div className="hidden md:flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Admin verified
+              </div>
+            ) : null}
 
             <ConnectButton.Custom>
               {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
@@ -138,14 +117,9 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3 md:hidden">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            <span className={`w-2 h-2 rounded-full ${wrongChain ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-            <span className="text-xs font-semibold text-slate-700">Chain {configuredChainId}</span>
-          </div>
-
           {hasAdminAccess ? (
             <button
-              onClick={() => onViewChange('ADMIN_DASHBOARD')}
+              onClick={openAdmin}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900"
             >
               Admin

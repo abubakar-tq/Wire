@@ -41,7 +41,7 @@ export function AdminDashboardView() {
               <h2 className="font-bold text-slate-900">Admin Access</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <InfoRow label="SIWE session" value={auth.authenticated ? 'Signed in' : 'Not signed in'} />
+              <InfoRow label="Admin verification" value={auth.authenticated ? 'Verified' : 'Not verified'} />
               <InfoRow label="Wallet" value={auth.session?.address ?? 'Connect wallet first'} />
               <InfoRow label="LegacyPassport" value={passport.data?.passport ? `#${passport.data.passport.tokenId}` : 'No passport yet'} />
               <InfoRow label="Admin roles" value={roles.admin || roles.operator || roles.scorePublisher || roles.treasury ? 'Granted' : 'Missing'} />
@@ -61,7 +61,7 @@ export function AdminDashboardView() {
               }}
               className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900"
             >
-              {auth.authenticated ? 'Sign out' : 'Sign in'}
+              {auth.authenticated ? 'Sign out' : 'Verify admin'}
             </button>
           </div>
         </div>

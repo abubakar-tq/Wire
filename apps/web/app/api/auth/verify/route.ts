@@ -24,7 +24,7 @@ const expectedChainId = readWireFluidChainId(process.env);
 export async function POST(request: NextRequest) {
   const parsed = verifyBody.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid SIWE payload" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid verification payload" }, { status: 400 });
   }
 
   const nonce = readNonceCookie(request);
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (!verification.success || siweMessage.chainId !== expectedChainId) {
-    const response = NextResponse.json({ error: "SIWE verification failed" }, { status: 401 });
+    const response = NextResponse.json({ error: "Admin verification failed" }, { status: 401 });
     clearNonceCookie(response);
     return response;
   }
