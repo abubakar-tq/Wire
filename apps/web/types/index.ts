@@ -1,11 +1,12 @@
 export type Role = 'WK' | 'BAT' | 'AR' | 'BOWL';
-export type Team = 'KK' | 'LQ' | 'IU' | 'PZ' | 'MS' | 'QG';
+export type Team = string;
 export type UserRole = 'PLAYER' | 'ADMIN';
 export type MatchStatus = 'SCHEDULED' | 'LOCKED' | 'LIVE' | 'FINALIZED';
 export type ViewType = 'DASHBOARD' | 'ARENA' | 'LEADERBOARD' | 'REWARDS' | 'ADMIN_DASHBOARD' | 'PROTOCOL' | 'MATCH' | 'SCORE' | 'TREASURY';
 
 export interface CricketPlayer {
   id: string;
+  chainPlayerId?: number;
   name: string;
   team: Team;
   role: Role;
