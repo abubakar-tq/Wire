@@ -64,8 +64,8 @@ function readDeploymentAddress(value: string | undefined): Address {
   if (!value || value === zeroAddress) {
     return zeroAddress;
   }
-  if (!isAddress(value)) {
+  if (!isAddress(value, { strict: false })) {
     throw new Error(`Invalid deployment address: ${value}`);
   }
-  return getAddress(value);
+  return getAddress(value.toLowerCase());
 }

@@ -34,7 +34,10 @@ export function readWireFluidChainId(env: Env, options: ConfigOptions = {}): num
   const primaryKey = options.publicPrefix ? "NEXT_PUBLIC_WIREFLUID_CHAIN_ID" : "WIREFLUID_CHAIN_ID";
   const fallbackKey = options.publicPrefix ? "WIREFLUID_CHAIN_ID" : "NEXT_PUBLIC_WIREFLUID_CHAIN_ID";
   const raw = env[primaryKey] ?? env[fallbackKey];
-  if (!raw) return WIREFLUID_TESTNET_CHAIN_ID;
+  if (!raw) {
+    const rpc = readRpcFromEnv(env, options);
+    return rpc && isLocalRpc(rpc) ? ANVIL_CHAIN_ID : WIREFLUID_TESTNET_CHAIN_ID;
+  }
 
   const chainId = Number(raw);
   if (!Number.isInteger(chainId) || chainId <= 0) {
@@ -44,9 +47,21 @@ export function readWireFluidChainId(env: Env, options: ConfigOptions = {}): num
 }
 
 export function readWireFluidRpcUrl(env: Env, options: ConfigOptions = {}): string {
+  const rpc = readRpcFromEnv(env, options);
+  if (rpc) {
+    return rpc;
+  }
+  return defaultRpcForChain(readWireFluidChainId(env, options));
+}
+
+function readRpcFromEnv(env: Env, options: ConfigOptions): string | undefined {
   const primaryKey = options.publicPrefix ? "NEXT_PUBLIC_WIREFLUID_RPC_URL" : "WIREFLUID_RPC_URL";
   const fallbackKey = options.publicPrefix ? "WIREFLUID_RPC_URL" : "NEXT_PUBLIC_WIREFLUID_RPC_URL";
-  return env[primaryKey] ?? env[fallbackKey] ?? defaultRpcForChain(readWireFluidChainId(env, options));
+  return env[primaryKey] ?? env[fallbackKey];
+}
+
+function isLocalRpc(rpcUrl: string): boolean {
+  return rpcUrl.includes("127.0.0.1") || rpcUrl.includes("localhost");
 }
 
 export function getWireFluidChain(env: Env, options: ConfigOptions = {}) {
