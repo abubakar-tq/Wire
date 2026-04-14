@@ -1,6 +1,8 @@
+import { eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { PLAYER_METADATA } from "@/lib/playerMetadata";
-import { ensurePlayerSchema, getDbPool, isDatabaseConfigured, PLAYER_SCHEMA } from "@/server/db";
+import { getDb, isDatabaseConfigured } from "@/server/db";
+import { players, type PlayerRow } from "@/server/db/schema";
 
 export type PlayerProfile = {
   playerId: number;
@@ -30,103 +32,78 @@ export async function listPlayers(options: { ids?: number[] } = {}): Promise<Pla
   if (!isDatabaseConfigured()) {
     return fallbackPlayers(options.ids);
   }
-  await ensurePlayerSchema();
-  const db = getDbPool();
-  const ids = options.ids?.length ? options.ids : null;
-  const result = ids
-    ? await db.query(
-        `SELECT player_id, display_name, team_code, role, image_url, active, metadata, created_at, updated_at
-         FROM ${PLAYER_SCHEMA}.players
-         WHERE player_id = ANY($1)
-         ORDER BY player_id ASC`,
-        [ids]
-      )
-    : await db.query(
-        `SELECT player_id, display_name, team_code, role, image_url, active, metadata, created_at, updated_at
-         FROM ${PLAYER_SCHEMA}.players
-         ORDER BY player_id ASC`
-      );
-  return result.rows.map(mapRow);
+  const db = getDb();
+  const rows = options.ids?.length
+    ? await db.select().from(players).where(inArray(players.playerId, options.ids)).orderBy(players.playerId)
+    : await db.select().from(players).orderBy(players.playerId);
+  return rows.map(mapRow);
 }
 
 export async function getPlayer(playerId: number): Promise<PlayerProfile | null> {
   if (!isDatabaseConfigured()) {
     return fallbackPlayers([playerId])[0] ?? null;
   }
-  await ensurePlayerSchema();
-  const db = getDbPool();
-  const result = await db.query(
-    `SELECT player_id, display_name, team_code, role, image_url, active, metadata, created_at, updated_at
-     FROM ${PLAYER_SCHEMA}.players
-     WHERE player_id = $1`,
-    [playerId]
-  );
-  return result.rows[0] ? mapRow(result.rows[0]) : null;
+  const db = getDb();
+  const rows = await db.select().from(players).where(eq(players.playerId, playerId)).limit(1);
+  return rows[0] ? mapRow(rows[0]) : null;
 }
 
-export async function upsertPlayers(players: PlayerProfileInput[]): Promise<PlayerProfile[]> {
+export async function upsertPlayers(inputs: PlayerProfileInput[]): Promise<PlayerProfile[]> {
   if (!isDatabaseConfigured()) {
     throw new Error("Player database is not configured");
   }
-  if (players.length === 0) return [];
-  await ensurePlayerSchema();
-  const db = getDbPool();
-  const values: unknown[] = [];
-  const rowsSql: string[] = [];
-  let idx = 1;
-  for (const player of players) {
-    rowsSql.push(
-      `($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`
-    );
-    values.push(
-      player.playerId,
-      player.name,
-      player.teamCode ?? null,
-      player.role ?? null,
-      player.imageUrl ?? null,
-      player.active ?? true,
-      JSON.stringify(player.metadata ?? {})
-    );
-  }
+  if (inputs.length === 0) return [];
+  const db = getDb();
 
-  const result = await db.query(
-    `INSERT INTO ${PLAYER_SCHEMA}.players
-      (player_id, display_name, team_code, role, image_url, active, metadata)
-     VALUES ${rowsSql.join(", ")}
-     ON CONFLICT (player_id) DO UPDATE SET
-       display_name = EXCLUDED.display_name,
-       team_code = EXCLUDED.team_code,
-       role = EXCLUDED.role,
-       image_url = EXCLUDED.image_url,
-       active = EXCLUDED.active,
-       metadata = EXCLUDED.metadata,
-       updated_at = NOW()
-     RETURNING player_id, display_name, team_code, role, image_url, active, metadata, created_at, updated_at`,
-    values
-  );
-  return result.rows.map(mapRow);
+  const values = inputs.map((p) => ({
+    playerId: p.playerId,
+    displayName: p.name,
+    teamCode: p.teamCode ?? null,
+    role: p.role ?? null,
+    imageUrl: p.imageUrl ?? null,
+    active: p.active ?? true,
+    metadata: p.metadata ?? {}
+  }));
+
+  const rows = await db
+    .insert(players)
+    .values(values)
+    .onConflictDoUpdate({
+      target: players.playerId,
+      set: {
+        displayName: sql`excluded.display_name`,
+        teamCode: sql`excluded.team_code`,
+        role: sql`excluded.role`,
+        imageUrl: sql`excluded.image_url`,
+        active: sql`excluded.active`,
+        metadata: sql`excluded.metadata`,
+        updatedAt: sql`now()`
+      }
+    })
+    .returning();
+
+  return rows.map(mapRow);
 }
 
 export async function deletePlayer(playerId: number): Promise<void> {
   if (!isDatabaseConfigured()) {
     throw new Error("Player database is not configured");
   }
-  await ensurePlayerSchema();
-  const db = getDbPool();
-  await db.query(`DELETE FROM ${PLAYER_SCHEMA}.players WHERE player_id = $1`, [playerId]);
+  const db = getDb();
+  await db.delete(players).where(eq(players.playerId, playerId));
 }
 
-function mapRow(row: Record<string, unknown>): PlayerProfile {
+function mapRow(row: PlayerRow): PlayerProfile {
   return {
-    playerId: Number(row.player_id),
-    name: String(row.display_name),
-    teamCode: row.team_code ? String(row.team_code) : null,
-    role: row.role ? String(row.role) : null,
-    imageUrl: row.image_url ? String(row.image_url) : null,
-    active: Boolean(row.active),
+    playerId: row.playerId,
+    name: row.displayName,
+    teamCode: row.teamCode,
+    role: row.role,
+    imageUrl: row.imageUrl,
+    active: row.active,
     metadata: (row.metadata as Record<string, unknown>) ?? {},
-    createdAt: new Date(String(row.created_at)).toISOString(),
-    updatedAt: new Date(String(row.updated_at)).toISOString()
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
   };
 }
 
