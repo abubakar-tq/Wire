@@ -1,0 +1,222 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import {FantasyArenaTestBase} from "./FantasyArenaTestBase.sol";
+import {
+    ContestAlreadyExists,
+    ContestFull,
+    MatchAlreadyHasContest,
+    MatchLocked,
+    NoRefund,
+    NoReward,
+    NotEnoughEntries,
+    StatsNotSubmitted,
+    WalletEntryLimitReached,
+    WrongEntryFee
+} from "../src/errors/Errors.sol";
+import {Contest, Entry, MatchStatus} from "../src/types/Structs.sol";
+
+contract ContestManagerTest is FantasyArenaTestBase {
+    function testCreateContestSuccess() public {
+        _createMatchWithPlayers();
+        _createContest();
+
+        Contest memory contest = contests.getContest(CONTEST_ID);
+        assertEq(contest.matchId, MATCH_ID);
+        assertEq(contest.entryFee, ENTRY_FEE);
+        assertEq(contest.maxEntries, 25);
+        assertEq(contest.maxEntriesPerWallet, 3);
+        assertTrue(contest.exists);
+        assertEq(contests.contestIdByMatch(MATCH_ID), CONTEST_ID);
+    }
+
+    function testRejectDuplicateContestAndSecondContestForMatch() public {
+        _createMatchWithPlayers();
+        _createContest();
+
+        vm.expectRevert(ContestAlreadyExists.selector);
+        contests.createContest(CONTEST_ID, MATCH_ID, ENTRY_FEE, 25, 3);
+
+        vm.expectRevert(abi.encodeWithSelector(MatchAlreadyHasContest.selector, MATCH_ID, CONTEST_ID));
+        contests.createContest(101, MATCH_ID, ENTRY_FEE, 25, 3);
+    }
+
+    function testJoinContestSuccessAndMintsNFT() public {
+        _createMatchWithPlayers();
+        _createContest();
+
+        uint256 tokenId = _join(alice, _validSquad());
+        Contest memory contest = contests.getContest(CONTEST_ID);
+
+        assertEq(tokenId, 1);
+        assertEq(nft.ownerOf(tokenId), alice);
+        assertEq(contest.totalEntries, 1);
+        assertEq(contests.entriesByWallet(CONTEST_ID, alice), 1);
+        assertTrue(contests.tokenEntered(CONTEST_ID, tokenId));
+    }
+
+    function testRejectWrongFee() public {
+        _createMatchWithPlayers();
+        _createContest();
+        uint16[11] memory squad = _validSquad();
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(WrongEntryFee.selector, ENTRY_FEE, ENTRY_FEE - 1));
+        contests.joinContest{value: ENTRY_FEE - 1}(CONTEST_ID, squad, squad[0], squad[1]);
+    }
+
+    function testRejectContestFull() public {
+        _createMatchWithPlayers();
+        contests.createContest(101, MATCH_ID, ENTRY_FEE, 3, 3);
+
+        _join(101, alice, _validSquad());
+        _join(101, bob, _alternateSquad());
+        _join(101, carol, _higherSquad());
+
+        vm.prank(dave);
+        vm.expectRevert(ContestFull.selector);
+        contests.joinContest{value: ENTRY_FEE}(101, _validSquad(), 1, 2);
+    }
+
+    function testEnforceMaxThreeEntriesPerWallet() public {
+        _createMatchWithPlayers();
+        _createContest();
+
+        _join(alice, _validSquad());
+        _join(alice, _alternateSquad());
+        _join(alice, _higherSquad());
+
+        vm.prank(alice);
+        vm.expectRevert(WalletEntryLimitReached.selector);
+        contests.joinContest{value: ENTRY_FEE}(CONTEST_ID, _validSquad(), 1, 2);
+    }
+
+    function testRejectJoinAfterMatchLock() public {
+        _createMatchWithPlayers();
+        _createContest();
+        vm.warp(block.timestamp + 1 days + 1);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(MatchLocked.selector, MATCH_ID));
+        contests.joinContest{value: ENTRY_FEE}(CONTEST_ID, _validSquad(), 1, 2);
+    }
+
+    function testFinalizeOnlyAfterStatsSubmitted() public {
+        _createMatchWithPlayers();
+        _createContest();
+        _join(alice, _validSquad());
+        _join(bob, _alternateSquad());
+        _join(carol, _higherSquad());
+
+        vm.expectRevert(abi.encodeWithSelector(StatsNotSubmitted.selector, MATCH_ID));
+        contests.finalizeContest(CONTEST_ID);
+    }
+
+    function testRejectFinalizeWithFewerThanThreeEntries() public {
+        _createMatchWithPlayers();
+        _createContest();
+        _join(alice, _validSquad());
+        _join(bob, _alternateSquad());
+        _submitLinearStats(MATCH_ID);
+
+        vm.expectRevert(NotEnoughEntries.selector);
+        contests.finalizeContest(CONTEST_ID);
+    }
+
+    function testComputeTeamScoreAndFinalizeRewards() public {
+        _createMatchWithPlayers();
+        _createContest();
+        uint256 aliceToken = _join(alice, _validSquad());
+        _join(bob, _alternateSquad());
+        _join(carol, _higherSquad());
+        _submitLinearStats(MATCH_ID);
+
+        assertEq(contests.previewSquadScore(MATCH_ID, aliceToken), int32(118));
+        contests.finalizeContest(CONTEST_ID);
+
+        (uint16[3] memory winnerIndexes, uint256[3] memory rewards) = contests.getWinners(CONTEST_ID);
+        assertEq(winnerIndexes[0], 2);
+        assertEq(winnerIndexes[1], 1);
+        assertEq(winnerIndexes[2], 0);
+        assertEq(rewards[0], 1.35 ether);
+        assertEq(rewards[1], 0.81 ether);
+        assertEq(rewards[2], 0.54 ether);
+        assertEq(contests.treasuryClaimable(), 0.3 ether);
+        assertEq(contests.claimableRewards(carol), 1.35 ether);
+        assertEq(uint8(registry.getMatch(MATCH_ID).status), uint8(MatchStatus.Finalized));
+    }
+
+    function testTieBreakerBehavior() public {
+        _createMatchWithPlayers();
+        _createContest();
+        _join(alice, _validSquad());
+        vm.warp(block.timestamp + 1);
+        _join(bob, _validSquad());
+        vm.warp(block.timestamp + 1);
+        _join(carol, _validSquad());
+        _submitLinearStats(MATCH_ID);
+
+        contests.finalizeContest(CONTEST_ID);
+        (uint16[3] memory winnerIndexes,) = contests.getWinners(CONTEST_ID);
+        assertEq(winnerIndexes[0], 0);
+        assertEq(winnerIndexes[1], 1);
+        assertEq(winnerIndexes[2], 2);
+    }
+
+    function testClaimRewardSuccessAndDoubleClaimImpossible() public {
+        _createMatchWithPlayers();
+        _createContest();
+        _finalizeHappyPath();
+
+        uint256 beforeBalance = carol.balance;
+        vm.prank(carol);
+        contests.claimReward();
+        assertEq(carol.balance, beforeBalance + 1.35 ether);
+
+        vm.prank(carol);
+        vm.expectRevert(NoReward.selector);
+        contests.claimReward();
+    }
+
+    function testCancelContestAndRefundClaims() public {
+        _createMatchWithPlayers();
+        _createContest();
+        _join(alice, _validSquad());
+        _join(bob, _alternateSquad());
+
+        contests.cancelContest(CONTEST_ID);
+        assertEq(contests.refundableEntries(alice), ENTRY_FEE);
+        assertEq(contests.refundableEntries(bob), ENTRY_FEE);
+        assertEq(uint8(registry.getMatch(MATCH_ID).status), uint8(MatchStatus.Cancelled));
+
+        uint256 beforeBalance = alice.balance;
+        vm.prank(alice);
+        contests.claimRefund();
+        assertEq(alice.balance, beforeBalance + ENTRY_FEE);
+
+        vm.prank(alice);
+        vm.expectRevert(NoRefund.selector);
+        contests.claimRefund();
+    }
+
+    function testClaimTreasury() public {
+        _createMatchWithPlayers();
+        _createContest();
+        _finalizeHappyPath();
+
+        uint256 beforeBalance = treasury.balance;
+        vm.prank(treasury);
+        contests.claimTreasury();
+        assertEq(treasury.balance, beforeBalance + 0.3 ether);
+        assertEq(contests.treasuryClaimable(), 0);
+    }
+
+    function testFinalizedEntriesStoreScores() public {
+        _createMatchWithPlayers();
+        _createContest();
+        _finalizeHappyPath();
+
+        Entry memory entry = contests.getEntry(CONTEST_ID, 0);
+        assertEq(entry.score, int32(118));
+    }
+}
