@@ -21,7 +21,8 @@ export function AIInsightCard({ onGetInsight }: AIInsightCardProps) {
     setLoading(true);
     // Simulate API delay
     setTimeout(() => {
-      const newInsight = MOCK_INSIGHTS[Math.floor(Math.random() * MOCK_INSIGHTS.length)];
+      const fallbackInsight = MOCK_INSIGHTS[Math.floor(Math.random() * MOCK_INSIGHTS.length)] ?? MOCK_INSIGHTS[0]!;
+      const newInsight = onGetInsight() || fallbackInsight;
       setInsight(newInsight);
       setLoading(false);
     }, 600);
