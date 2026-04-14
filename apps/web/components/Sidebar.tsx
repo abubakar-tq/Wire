@@ -7,6 +7,7 @@ import { useState } from 'react';
 interface SidebarProps {
   state: AppState;
   onViewChange: (view: ViewType) => void;
+  hasAdminAccess?: boolean;
 }
 
 const PLAYER_MENU = [
@@ -24,9 +25,9 @@ const ADMIN_MENU = [
   { icon: Wallet, label: 'Treasury', view: 'TREASURY' as ViewType },
 ];
 
-export function Sidebar({ state, onViewChange }: SidebarProps) {
+export function Sidebar({ state, onViewChange, hasAdminAccess = false }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const menuItems = state.userRole === 'PLAYER' ? PLAYER_MENU : ADMIN_MENU;
+  const menuItems = hasAdminAccess ? ADMIN_MENU : PLAYER_MENU;
 
   return (
     <aside className={`${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-[#E5E7EB] h-[calc(100vh-73px)] overflow-y-auto transition-smooth flex flex-col`}>
@@ -79,37 +80,14 @@ export function Sidebar({ state, onViewChange }: SidebarProps) {
           {!isCollapsed && 'Collapse'}
         </button>
 
-        {/* User Role Toggle */}
+        {/* Role Source */}
         {!isCollapsed && (
           <div className="pt-2 border-t border-[#E5E7EB] space-y-2">
-            <p className="text-xs font-semibold text-[#5B6B7A] px-2">MODE</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  const controller = (window as any).__controller;
-                  if (controller) controller.actions.setUserRole('PLAYER');
-                }}
-                className={`flex-1 text-xs px-3 py-2 rounded-lg transition-smooth font-medium ${
-                  state.userRole === 'PLAYER'
-                    ? 'bg-[#10B981] text-white shadow-elevated'
-                    : 'bg-[#FAFAFA] text-[#5B6B7A] hover:bg-[#F0FDF4]'
-                }`}
-              >
-                Player
-              </button>
-              <button
-                onClick={() => {
-                  const controller = (window as any).__controller;
-                  if (controller) controller.actions.setUserRole('ADMIN');
-                }}
-                className={`flex-1 text-xs px-3 py-2 rounded-lg transition-smooth font-medium ${
-                  state.userRole === 'ADMIN'
-                    ? 'bg-[#2563EB] text-white shadow-elevated'
-                    : 'bg-[#FAFAFA] text-[#5B6B7A] hover:bg-[#F0FDF4]'
-                }`}
-              >
-                Admin
-              </button>
+            <p className="text-xs font-semibold text-[#5B6B7A] px-2">ACCESS</p>
+            <div className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+              hasAdminAccess ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+            }`}>
+              {hasAdminAccess ? 'On-chain admin roles' : 'Player wallet'}
             </div>
           </div>
         )}

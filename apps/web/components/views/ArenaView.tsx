@@ -6,6 +6,8 @@ import { CricketPlayer, Squad } from '@/types/index';
 import { PlayerList } from '@/components/PlayerList';
 import { CricketPitch } from '@/components/CricketPitch';
 import { NFTPreviewCard } from '@/components/NFTPreviewCard';
+import type { IndexedContest } from '@/api/indexerClient';
+import { formatWire } from '@/utils/arenaFormat';
 
 interface ArenaViewProps {
   availablePlayers: CricketPlayer[];
@@ -17,6 +19,11 @@ interface ArenaViewProps {
   onRemovePlayer: (playerId: string) => void;
   onSetCaptain: (playerId: string) => void;
   onSetViceCaptain: (playerId: string) => void;
+  selectedContest?: IndexedContest | null;
+  onJoinContest?: () => Promise<void>;
+  isJoining?: boolean;
+  txHash?: string;
+  txError?: string;
 }
 
 export function ArenaView({
@@ -29,6 +36,11 @@ export function ArenaView({
   onRemovePlayer,
   onSetCaptain,
   onSetViceCaptain,
+  selectedContest,
+  onJoinContest,
+  isJoining = false,
+  txHash,
+  txError,
 }: ArenaViewProps) {
   const [showNFTPreview, setShowNFTPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -201,23 +213,39 @@ export function ArenaView({
               {/* NFT Preview and Actions - Takes 1 col */}
               <div className="space-y-4">
                 <NFTPreviewCard squadId="#2841" squadName="My Arena" captainName={squad.players.find(p => p.id === squad.captainId)?.name || 'N/A'} playersCount={squad.players.length} />
+
+                {selectedContest && (
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Contest</span>
+                      <span className="font-semibold text-slate-900">#{selectedContest.contestId}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-slate-600">Entry fee</span>
+                      <span className="font-semibold text-slate-900">{formatWire(selectedContest.entryFee)}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-slate-600">Entries</span>
+                      <span className="font-semibold text-slate-900">{selectedContest.totalEntries}/{selectedContest.maxEntries}</span>
+                    </div>
+                  </div>
+                )}
                 
                 <button
                   onClick={handleMintNFT}
-                  disabled={!isSquadValid || matchStatus === 'LOCKED'}
+                  disabled={!isSquadValid || matchStatus === 'LOCKED' || !selectedContest || isJoining}
                   className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-smooth flex items-center justify-center gap-2 ${
-                    isSquadValid && matchStatus !== 'LOCKED'
+                    isSquadValid && matchStatus !== 'LOCKED' && selectedContest && !isJoining
                       ? 'bg-teal-600 hover:bg-teal-700 shadow-sm hover:shadow-md active:scale-95'
                       : 'bg-slate-300 cursor-not-allowed'
                   }`}
                 >
                   <Sparkles className="w-4 h-4" />
-                  Mint Squad NFT
+                  {isJoining ? 'Joining Contest...' : selectedContest ? 'Join Contest' : 'No Open Contest'}
                 </button>
 
-                <button className="w-full py-2.5 px-4 rounded-lg font-semibold border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-smooth text-sm">
-                  Save Template
-                </button>
+                {txHash && <p className="text-xs text-slate-600 break-all">Submitted: {txHash}</p>}
+                {txError && <p className="text-xs text-red-600">{txError}</p>}
               </div>
             </div>
 
@@ -349,12 +377,13 @@ export function ArenaView({
               </button>
               <button
                 onClick={async () => {
-                  await new Promise((r) => setTimeout(r, 1200));
+                  if (onJoinContest) await onJoinContest();
                   setShowNFTPreview(false);
                 }}
-                className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-semibold text-sm transition-colors"
+                disabled={!onJoinContest || isJoining}
+                className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 font-semibold text-sm transition-colors"
               >
-                Mint NFT
+                {isJoining ? 'Waiting...' : 'Confirm Join'}
               </button>
             </div>
           </div>

@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import { Gift, Loader, CheckCircle } from 'lucide-react';
 import { useEffect } from 'react';
+import { contestManagerAbi } from '@wirefluid/contracts';
+import { contractAddresses } from '@/contracts/addresses';
+import { useCurrentUserPassport } from '@/api/useIndexerData';
+import { useArenaWriter } from '@/web3/useArenaWriter';
+import { formatWire } from '@/utils/arenaFormat';
 
 interface RewardsViewProps {
   wireBalance: number;
@@ -15,6 +20,10 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
   const [claimState, setClaimState] = useState<ClaimState>('IDLE');
   const [displayBalance, setDisplayBalance] = useState(0);
   const [confetti, setConfetti] = useState(false);
+  const passport = useCurrentUserPassport();
+  const writer = useArenaWriter();
+  const claimableReward = passport.data?.balance?.claimableReward ?? '0';
+  const refundableAmount = passport.data?.balance?.refundableAmount ?? '0';
 
   // Animate balance count-up
   useEffect(() => {
@@ -37,21 +46,16 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
   }, [claimState, wireBalance, displayBalance]);
 
   const handleClaimRewards = async () => {
-    setClaimState('LOADING');
-
-    await new Promise((r) => setTimeout(r, 400));
     setClaimState('AWAITING_SIGNATURE');
-
-    await new Promise((r) => setTimeout(r, 1200));
-    setClaimState('BROADCASTING');
-
-    await new Promise((r) => setTimeout(r, 1000));
+    await writer.write({
+      address: contractAddresses.contestManager,
+      abi: contestManagerAbi,
+      functionName: 'claimReward'
+    });
     setClaimState('CONFIRMED');
-
-    await new Promise((r) => setTimeout(r, 600));
     setClaimState('SUCCESS');
     setConfetti(true);
-    onClaimRewards(2400);
+    onClaimRewards(Number(claimableReward));
 
     setTimeout(() => {
       setConfetti(false);
@@ -60,6 +64,16 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
         setDisplayBalance(0);
       }, 1000);
     }, 2000);
+  };
+
+  const handleClaimRefund = async () => {
+    setClaimState('AWAITING_SIGNATURE');
+    await writer.write({
+      address: contractAddresses.contestManager,
+      abi: contestManagerAbi,
+      functionName: 'claimRefund'
+    });
+    setClaimState('SUCCESS');
   };
 
   return (
@@ -95,33 +109,38 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
             <Gift className="w-16 h-16 text-[#F5A623] mx-auto mb-6" />
             <p className="text-[#4B5563] text-lg mb-4">Your Pending Rewards</p>
             <div className="flex items-baseline justify-center gap-2 mb-8">
-              <span className="text-[#F5A623] text-3xl">◈</span>
-              <span className="text-6xl font-black text-[#0F1117] tabular-nums">2,400</span>
+              <span className="text-6xl font-black text-[#0F1117] tabular-nums">{formatWire(claimableReward)}</span>
             </div>
-            <p className="text-sm text-[#4B5563] mb-8 max-w-md mx-auto">
-              You&apos;ve earned premium rewards from your recent squad performances and leaderboard rankings
-            </p>
+            <p className="text-sm text-[#4B5563] mb-8 max-w-md mx-auto">Rewards and refunds are pull-based on-chain balances.</p>
             <button
               onClick={handleClaimRewards}
-              className="mx-auto px-8 py-4 bg-[#10B981] hover:bg-[#059669] text-white font-bold rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+              disabled={BigInt(claimableReward) === 0n || writer.isSubmitting}
+              className="mx-auto px-8 py-4 bg-[#10B981] hover:bg-[#059669] text-white font-bold rounded-lg transition-all disabled:opacity-50"
             >
               Claim Rewards
             </button>
+            <button
+              onClick={handleClaimRefund}
+              disabled={BigInt(refundableAmount) === 0n || writer.isSubmitting}
+              className="ml-3 px-8 py-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-lg transition-all disabled:opacity-50"
+            >
+              Claim Refunds ({formatWire(refundableAmount)})
+            </button>
+            {writer.error && <p className="mt-4 text-sm text-red-600">{writer.error}</p>}
           </div>
 
           {/* Recent Rewards */}
           <div>
-            <h2 className="text-lg font-bold text-[#0F1117] mb-4">Recent Winnings</h2>
+            <h2 className="text-lg font-bold text-[#0F1117] mb-4">Passport Stats</h2>
             <div className="space-y-3">
               {[
-                { label: 'Weekly Leaderboard Top 3', amount: 800 },
-                { label: 'Squad NFT Bonus', amount: 600 },
-                { label: 'Performance Multiplier', amount: 400 },
-                { label: 'Referral Rewards', amount: 600 },
+                { label: 'Contests entered', amount: passport.data?.passport?.contestsEntered ?? 0 },
+                { label: 'Winning entries', amount: passport.data?.passport?.contestsWon ?? 0 },
+                { label: 'Total rewards claimed', amount: formatWire(passport.data?.passport?.totalRewardsClaimed ?? '0') },
               ].map((reward, idx) => (
                 <div key={idx} className="bg-white border border-[#E5E7EB] rounded-lg p-4 flex items-center justify-between hover:shadow-md transition-all">
                   <span className="text-[#0F1117] font-medium">{reward.label}</span>
-                  <span className="font-bold text-[#F5A623] tabular-nums">◈ {reward.amount}</span>
+                  <span className="font-bold text-[#F5A623] tabular-nums">{reward.amount}</span>
                 </div>
               ))}
             </div>

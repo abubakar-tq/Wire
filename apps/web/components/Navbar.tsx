@@ -1,18 +1,38 @@
 'use client';
 
 import { Zap, Bell, Settings } from 'lucide-react';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useChainId } from 'wagmi';
+import { WIREFLUID_TESTNET_CHAIN_ID } from '@wirefluid/contracts';
 import { useState } from 'react';
 import { AppState } from '@/types/index';
+import { contractsConfigured } from '@/contracts/addresses';
+import { shortAddress } from '@/utils/arenaFormat';
+import type { RoleChecks } from '@/web3/useRoleChecks';
 
 interface NavbarProps {
   state: AppState;
+  roles: RoleChecks;
 }
 
-export function Navbar({ state }: NavbarProps) {
+export function Navbar({ state, roles }: NavbarProps) {
   const [showNotifications, setShowNotifications] = useState(false);
+  const chainId = useChainId();
+  const wrongChain = chainId !== WIREFLUID_TESTNET_CHAIN_ID;
+  const roleChips = [
+    ['Admin', roles.admin],
+    ['Operator', roles.operator],
+    ['Score Publisher', roles.scorePublisher],
+    ['Treasury', roles.treasury],
+  ] as const;
 
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm backdrop-blur-xs">
+      {(wrongChain || !contractsConfigured) && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+          {wrongChain ? 'Switch to WireFluid Testnet before writing transactions.' : 'Contract addresses are not configured.'}
+        </div>
+      )}
       <div className="px-4 md:px-8 py-4 flex items-center justify-between gap-4">
         {/* Left: Logo & Brand */}
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
@@ -28,12 +48,12 @@ export function Navbar({ state }: NavbarProps) {
         {/* Center: Match Ticker */}
         <div className="hidden lg:flex items-center gap-3 px-4 py-2.5 bg-slate-50 rounded-full border border-slate-200 shadow-sm hover:shadow-md transition-smooth group flex-shrink-0">
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse group-hover:scale-125 transition-smooth"></div>
-            <span className="text-sm font-semibold text-slate-900">KK vs MS</span>
-            <span className="text-xs text-slate-500 font-medium">LIVE</span>
+            <div className={`w-2 h-2 rounded-full group-hover:scale-125 transition-smooth ${wrongChain ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
+            <span className="text-sm font-semibold text-slate-900">WireFluid Testnet</span>
+            <span className="text-xs text-slate-500 font-medium">Chain {WIREFLUID_TESTNET_CHAIN_ID}</span>
           </div>
           <div className="w-px h-4 bg-slate-200"></div>
-          <span className="text-xs text-slate-500 hidden md:inline">45.2 • 8/10</span>
+          <span className="text-xs text-slate-500 hidden md:inline">{contractsConfigured ? 'Contracts ready' : 'Addresses missing'}</span>
         </div>
 
         {/* Right: Actions & Account */}
@@ -48,11 +68,47 @@ export function Navbar({ state }: NavbarProps) {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
           </button>
 
+          <div className="hidden xl:flex items-center gap-1">
+            {roleChips.map(([label, enabled]) => (
+              <span
+                key={label}
+                className={`rounded px-2 py-1 text-xs font-semibold ${
+                  enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+
+          <div className="hidden lg:block">
+            <ConnectButton.Custom>
+              {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
+                const connected = mounted && account && chain;
+                if (!connected) {
+                  return (
+                    <button onClick={openConnectModal} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white">
+                      Connect Wallet
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    onClick={chain.unsupported ? openChainModal : openAccountModal}
+                    className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+                  >
+                    {chain.unsupported ? 'Wrong network' : shortAddress(account.address)}
+                  </button>
+                );
+              }}
+            </ConnectButton.Custom>
+          </div>
+
           {/* Wallet Balance */}
           <div className="flex items-center gap-2 px-3 md:px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg hover:border-blue-300 transition-smooth shadow-sm hover:shadow-md group">
-            <span className="text-blue-600 font-bold text-lg">◈</span>
-            <div className="flex flex-col hidden sm:flex">
-              <span className="text-xs text-slate-600 font-medium">Balance</span>
+            <span className="text-blue-600 font-bold text-lg">WIRE</span>
+            <div className="flex-col hidden sm:flex">
+              <span className="text-xs text-slate-600 font-medium">Demo balance</span>
               <span className="font-bold text-slate-900 text-sm tabular-nums">{state.wireBalance.toLocaleString()}</span>
             </div>
             <span className="text-sm md:hidden font-bold text-slate-900 tabular-nums">{state.wireBalance.toLocaleString()}</span>
