@@ -86,7 +86,7 @@ export function useMatchData(matchId: string | bigint | null | undefined) {
         abi: matchRegistryAbi,
         functionName: "getMatchPlayerIds",
         args: [matchIdValue]
-      })) as readonly Array<number | bigint>;
+      })) as ReadonlyArray<number | bigint>;
 
       const playersMeta = await Promise.all(
         playerIds.map((playerId) =>
@@ -94,7 +94,7 @@ export function useMatchData(matchId: string | bigint | null | undefined) {
             address: contractAddresses.matchRegistry,
             abi: matchRegistryAbi,
             functionName: "getPlayerMeta",
-            args: [matchIdValue, playerId]
+            args: [matchIdValue, Number(playerId)]
           })
         )
       );
