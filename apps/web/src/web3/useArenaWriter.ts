@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChainId, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { WIREFLUID_TESTNET_CHAIN_ID } from "@wirefluid/contracts";
 import { indexerKeys } from "@/api/useIndexerData";
 import type { HexString } from "@/api/indexerClient";
 import { contractsConfigured } from "@/contracts/addresses";
+import { configuredChainId } from "@/chains/wireFluidTestnet";
 
 export function useArenaWriter() {
   const queryClient = useQueryClient();
@@ -30,9 +30,9 @@ export function useArenaWriter() {
       setLocalError("Contract addresses are not configured");
       throw new Error("Contract addresses are not configured");
     }
-    if (chainId !== WIREFLUID_TESTNET_CHAIN_ID) {
-      setLocalError("Switch to WireFluid Testnet");
-      throw new Error("Switch to WireFluid Testnet");
+    if (chainId !== configuredChainId) {
+      setLocalError(`Switch to chain ${configuredChainId}`);
+      throw new Error(`Switch to chain ${configuredChainId}`);
     }
     const nextHash = await writer.writeContractAsync(args);
     setHash(nextHash);

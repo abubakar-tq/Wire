@@ -4,17 +4,17 @@ import {
   CONTEST_OPERATOR_ROLE,
   DEFAULT_ADMIN_ROLE,
   getContractAddresses,
+  getWireFluidChain,
   MATCH_OPERATOR_ROLE,
   SCORE_PUBLISHER_ROLE,
-  wireFluidTestnet,
-  WIREFLUID_TESTNET_RPC_URL
+  readWireFluidRpcUrl
 } from "@wirefluid/contracts";
 import { createPublicClient, http, isAddressEqual, type Address } from "viem";
 import type { RoleSnapshot } from "./session";
 
 const publicClient = createPublicClient({
-  chain: wireFluidTestnet,
-  transport: http(process.env.WIREFLUID_RPC_URL ?? WIREFLUID_TESTNET_RPC_URL)
+  chain: getWireFluidChain(process.env),
+  transport: http(readWireFluidRpcUrl(process.env))
 });
 
 export async function getRoleSnapshot(address: Address): Promise<RoleSnapshot> {

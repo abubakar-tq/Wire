@@ -1,16 +1,4 @@
-import { wireFluidTestnet as baseWireFluidTestnet } from "@wirefluid/contracts";
-import { defineChain } from "viem";
+import { getWireFluidChain, readWireFluidChainId } from "@wirefluid/contracts";
 
-const rpcUrl = process.env.NEXT_PUBLIC_WIREFLUID_RPC_URL ?? baseWireFluidTestnet.rpcUrls.default.http[0];
-
-export const wireFluidTestnet = defineChain({
-  ...baseWireFluidTestnet,
-  rpcUrls: {
-    default: {
-      http: [rpcUrl]
-    },
-    public: {
-      http: [rpcUrl]
-    }
-  }
-});
+export const configuredChainId = readWireFluidChainId(process.env, { publicPrefix: true });
+export const wireFluidTestnet = getWireFluidChain(process.env, { publicPrefix: true });

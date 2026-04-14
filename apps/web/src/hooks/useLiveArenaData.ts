@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import type { IndexedContest } from "@/api/indexerClient";
 import { useIndexedContest, useIndexedContests, useIndexedLeaderboard, useIndexedMatch } from "@/api/useIndexerData";
-import { CRICKET_PLAYERS, MOCK_LEADERBOARD } from "@/lib/mock-data";
 import type { CricketPlayer, LeaderboardEntry } from "@/types/index";
 import { roleLabel, safePlayerName, teamCodeFromBytes, teamSideLabel } from "@/utils/arenaFormat";
 
@@ -17,7 +16,7 @@ export function useLiveArenaData() {
   const availablePlayers = useMemo<CricketPlayer[]>(() => {
     const match = matchQuery.data?.match;
     const players = matchQuery.data?.players ?? [];
-    if (!match || players.length === 0) return CRICKET_PLAYERS;
+    if (!match || players.length === 0) return [];
 
     const homeTeam = teamCodeFromBytes(match.homeTeam, "HOME");
     const awayTeam = teamCodeFromBytes(match.awayTeam, "AWAY");
@@ -36,7 +35,7 @@ export function useLiveArenaData() {
 
   const leaderboard = useMemo<LeaderboardEntry[]>(() => {
     const rows = leaderboardQuery.data ?? [];
-    if (rows.length === 0) return MOCK_LEADERBOARD;
+    if (rows.length === 0) return [];
 
     return rows
       .map((row, index) => {

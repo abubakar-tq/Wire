@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SiweMessage } from "siwe";
 import { getAddress } from "viem";
 import { z } from "zod";
-import { WIREFLUID_TESTNET_CHAIN_ID } from "@wirefluid/contracts";
+import { readWireFluidChainId } from "@wirefluid/contracts";
 import { getRoleSnapshot } from "@/server/auth/roleChecks";
 import {
   clearNonceCookie,
@@ -18,6 +18,8 @@ const verifyBody = z.object({
   message: z.string().min(1),
   signature: z.string().regex(/^0x[0-9a-fA-F]+$/)
 });
+
+const expectedChainId = readWireFluidChainId(process.env);
 
 export async function POST(request: NextRequest) {
   const parsed = verifyBody.safeParse(await request.json().catch(() => null));
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
     nonce
   });
 
-  if (!verification.success || siweMessage.chainId !== WIREFLUID_TESTNET_CHAIN_ID) {
+  if (!verification.success || siweMessage.chainId !== expectedChainId) {
     const response = NextResponse.json({ error: "SIWE verification failed" }, { status: 401 });
     clearNonceCookie(response);
     return response;
@@ -55,7 +57,7 @@ export async function POST(request: NextRequest) {
   const now = Date.now();
   const session: AuthSession = {
     address,
-    chainId: WIREFLUID_TESTNET_CHAIN_ID,
+    chainId: expectedChainId,
     roles,
     issuedAt: now,
     expiresAt: now + 8 * 60 * 60 * 1000

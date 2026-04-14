@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SiweMessage } from "siwe";
 import { useAccount, useSignMessage } from "wagmi";
-import { WIREFLUID_TESTNET_CHAIN_ID } from "@wirefluid/contracts";
+import { configuredChainId } from "@/chains/wireFluidTestnet";
 import type { AuthSession } from "@/server/auth/session";
 
 type SessionResponse = {
@@ -42,7 +42,7 @@ export function useSiweSession() {
         statement: "Sign in to WireFluid Fantasy Arena admin.",
         uri: window.location.origin,
         version: "1",
-        chainId: WIREFLUID_TESTNET_CHAIN_ID,
+        chainId: configuredChainId,
         nonce
       });
 

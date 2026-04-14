@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { AppState, Squad, ViewType, CricketPlayer, LeaderboardEntry } from '@/types/index';
-import { CRICKET_PLAYERS, MOCK_LEADERBOARD } from './mock-data';
+import { useState, useCallback } from 'react';
+import { AppState, ViewType, CricketPlayer } from '@/types/index';
 
 export function useAppController() {
   const [state, setState] = useState<AppState>({
@@ -13,10 +12,10 @@ export function useAppController() {
       captainId: null,
       viceCaptainId: null,
     },
-    wireBalance: 2450,
+    wireBalance: 0,
     matchStatus: 'LIVE',
     livePointsTick: 0,
-    leaderboard: MOCK_LEADERBOARD,
+    leaderboard: [],
     selectedPlayerId: null,
   });
 
@@ -134,9 +133,8 @@ export function useAppController() {
 
   // Get available players
   const getAvailablePlayers = useCallback(() => {
-    const selectedIds = new Set(state.squad.players.map((p) => p.id));
-    return CRICKET_PLAYERS.filter((p) => !selectedIds.has(p.id));
-  }, [state.squad.players]);
+    return [];
+  }, []);
 
   // Calculate squad credits used
   const getCreditsUsed = useCallback(() => {
