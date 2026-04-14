@@ -43,8 +43,12 @@ import {
     ContestCreated,
     ContestFinalized,
     ContestJoined,
+    ContestWinnerRecorded,
+    EntryScoreComputed,
+    RefundCredited,
     RefundClaimed,
     RewardClaimed,
+    TreasuryAccrued,
     TreasuryClaimed,
     TreasuryUpdated
 } from "./events/Events.sol";
@@ -124,7 +128,7 @@ contract ContestManager is AccessControl, ReentrancyGuard {
         });
         contestIdByMatch[matchId] = contestId;
 
-        emit ContestCreated(contestId, matchId, entryFee, maxEntries, maxEntriesPerWallet);
+        emit ContestCreated(contestId, matchId, entryFee, maxEntries, maxEntriesPerWallet, msg.sender);
     }
 
     function joinContest(uint256 contestId, uint16[11] calldata playerIds, uint16 captainId, uint16 viceCaptainId)
@@ -143,7 +147,7 @@ contract ContestManager is AccessControl, ReentrancyGuard {
         }
         if (matchRegistry.isLocked(contest.matchId)) revert MatchLocked(contest.matchId);
 
-        legacyPassport.mintIfNeeded(msg.sender);
+        uint256 passportTokenId = legacyPassport.mintIfNeeded(msg.sender);
         tokenId = fantasyTeamNFT.mintSquad(msg.sender, contest.matchId, playerIds, captainId, viceCaptainId);
 
         uint16 entryIndex = contest.totalEntries;
@@ -157,7 +161,7 @@ contract ContestManager is AccessControl, ReentrancyGuard {
         }
         legacyPassport.recordEntry(msg.sender);
 
-        emit ContestJoined(contestId, contest.matchId, msg.sender, tokenId, entryIndex);
+        emit ContestJoined(contestId, contest.matchId, msg.sender, tokenId, passportTokenId, entryIndex);
     }
 
     function finalizeContest(uint256 contestId) external onlyRole(OPERATOR_ROLE) {
@@ -174,6 +178,10 @@ contract ContestManager is AccessControl, ReentrancyGuard {
         for (uint256 i = 0; i < entries.length; ++i) {
             int32 score = previewSquadScore(contest.matchId, entries[i].tokenId);
             entries[i].score = score;
+            // Safe because contest entries are capped at 25.
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint16 entryIndex = uint16(i);
+            emit EntryScoreComputed(contestId, contest.matchId, entries[i].user, entryIndex, entries[i].tokenId, score);
 
             for (uint256 rank = 0; rank < 3; ++rank) {
                 if (!topSet[rank] || _entryBeats(entries[i], entries[topIndexes[rank]])) {
@@ -181,9 +189,7 @@ contract ContestManager is AccessControl, ReentrancyGuard {
                         topIndexes[shift] = topIndexes[shift - 1];
                         topSet[shift] = topSet[shift - 1];
                     }
-                    // Safe because contest entries are capped at 25.
-                    // forge-lint: disable-next-line(unsafe-typecast)
-                    topIndexes[rank] = uint16(i);
+                    topIndexes[rank] = entryIndex;
                     topSet[rank] = true;
                     break;
                 }
@@ -202,15 +208,19 @@ contract ContestManager is AccessControl, ReentrancyGuard {
         _winnerIndexes[contestId] = topIndexes;
         _winnerRewards[contestId] = rewards;
         treasuryClaimable += treasuryFee;
+        emit TreasuryAccrued(contestId, contest.matchId, treasuryFee, treasuryClaimable);
 
         for (uint256 i = 0; i < 3; ++i) {
-            address winner = entries[topIndexes[i]].user;
-            claimableRewards[winner] += rewards[i];
-            legacyPassport.recordWin(winner);
+            // Safe because this loop only emits ranks 1 through 3.
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint8 rank = uint8(i + 1);
+            _creditWinner(contestId, contest.matchId, entries[topIndexes[i]], rank, topIndexes[i], rewards[i]);
         }
 
         matchRegistry.updateMatchStatus(contest.matchId, MatchStatus.Finalized);
-        emit ContestFinalized(contestId, contest.matchId, topIndexes, rewards, treasuryFee);
+        emit ContestFinalized(
+            contestId, contest.matchId, topIndexes, rewards, contest.totalEntries, prizePool, treasuryFee, msg.sender
+        );
     }
 
     function cancelContest(uint256 contestId) external onlyRole(OPERATOR_ROLE) {
@@ -222,10 +232,24 @@ contract ContestManager is AccessControl, ReentrancyGuard {
         Entry[] storage entries = _contestEntries[contestId];
         for (uint256 i = 0; i < entries.length; ++i) {
             refundableEntries[entries[i].user] += contest.entryFee;
+            // Safe because contest entries are capped at 25.
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint16 entryIndex = uint16(i);
+            emit RefundCredited(
+                contestId,
+                contest.matchId,
+                entries[i].user,
+                entries[i].tokenId,
+                entryIndex,
+                contest.entryFee,
+                refundableEntries[entries[i].user]
+            );
         }
 
         matchRegistry.updateMatchStatus(contest.matchId, MatchStatus.Cancelled);
-        emit ContestCancelledEvent(contestId, contest.matchId, entries.length);
+        emit ContestCancelledEvent(
+            contestId, contest.matchId, entries.length, uint256(contest.entryFee) * entries.length, msg.sender
+        );
     }
 
     function claimReward() external nonReentrant {
@@ -253,14 +277,14 @@ contract ContestManager is AccessControl, ReentrancyGuard {
         if (amount == 0) revert NoTreasuryBalance();
         treasuryClaimable = 0;
         _sendNative(treasury, amount);
-        emit TreasuryClaimed(treasury, amount);
+        emit TreasuryClaimed(treasury, amount, msg.sender);
     }
 
     function setTreasury(address newTreasury) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newTreasury == address(0)) revert ZeroAddress();
         address previousTreasury = treasury;
         treasury = newTreasury;
-        emit TreasuryUpdated(previousTreasury, newTreasury);
+        emit TreasuryUpdated(previousTreasury, newTreasury, msg.sender);
     }
 
     function getContest(uint256 contestId) external view returns (Contest memory) {
@@ -328,6 +352,22 @@ contract ContestManager is AccessControl, ReentrancyGuard {
             return candidate.joinedAt < incumbent.joinedAt;
         }
         return candidate.tokenId < incumbent.tokenId;
+    }
+
+    function _creditWinner(
+        uint256 contestId,
+        uint256 matchId,
+        Entry storage winnerEntry,
+        uint8 rank,
+        uint16 entryIndex,
+        uint256 reward
+    ) private {
+        address winner = winnerEntry.user;
+        claimableRewards[winner] += reward;
+        legacyPassport.recordWin(winner);
+        emit ContestWinnerRecorded(
+            contestId, matchId, winner, rank, entryIndex, winnerEntry.tokenId, winnerEntry.score, reward
+        );
     }
 
     function _sendNative(address to, uint256 amount) private {

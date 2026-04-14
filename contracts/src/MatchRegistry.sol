@@ -68,7 +68,7 @@ contract MatchRegistry is AccessControl {
             exists: true
         });
 
-        emit MatchCreated(matchId, homeTeam, awayTeam, startTime, lockTime);
+        emit MatchCreated(matchId, homeTeam, awayTeam, startTime, lockTime, msg.sender);
     }
 
     function setMatchPlayers(
@@ -105,7 +105,7 @@ contract MatchRegistry is AccessControl {
             _matchPlayerIds[matchId].push(playerId);
         }
 
-        emit MatchPlayersSet(matchId, playerIds.length);
+        emit MatchPlayersSet(matchId, playerIds.length, playerIds, roles, teamSides, msg.sender);
     }
 
     function updateMatchStatus(uint256 matchId, MatchStatus newStatus) external onlyStatusUpdater {
@@ -115,7 +115,7 @@ contract MatchRegistry is AccessControl {
         if (!_isValidTransition(previousStatus, newStatus)) revert InvalidStatusTransition();
 
         info.status = newStatus;
-        emit MatchStatusUpdated(matchId, previousStatus, newStatus);
+        emit MatchStatusUpdated(matchId, previousStatus, newStatus, msg.sender);
     }
 
     function isLocked(uint256 matchId) public view returns (bool) {

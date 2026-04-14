@@ -490,28 +490,53 @@ Read from `ContestManager`:
 - Winners and reward amounts: `getWinners`.
 - User balances: `getClaimableReward`, `getRefundableEntryAmount`.
 
-Index events from `src/events/Events.sol` for realtime UI state:
+Index events from `src/events/Events.sol` for realtime UI state. Events include actor context where useful so an indexer can reconstruct admin and user activity without repeatedly polling contract views.
 
-- `MatchCreated`
-- `MatchPlayersSet`
-- `MatchStatusUpdated`
-- `SquadMinted`
-- `SquadUpdated`
-- `LegacyPassportMinted`
-- `LegacyEntryRecorded`
-- `LegacyWinRecorded`
-- `LegacyRewardRecorded`
-- `LegacyPassportBaseURIUpdated`
-- `MatchStatsSubmitted`
-- `PlayerPointsComputed`
-- `ContestCreated`
-- `ContestJoined`
-- `ContestFinalized`
-- `ContestCancelled`
-- `RewardClaimed`
-- `RefundClaimed`
-- `TreasuryUpdated`
-- `TreasuryClaimed`
+Match events:
+
+- `MatchCreated`: match ID, teams, start time, lock time, operator.
+- `MatchPlayersSet`: full player ID, role, and team-side arrays for the match player pool.
+- `MatchStatusUpdated`: previous status, new status, updater.
+
+Squad and passport events:
+
+- `SquadMinted`: squad token ID, owner, match ID, players, captain, vice-captain, minter.
+- `SquadUpdated`: squad token ID, match ID, replacement squad, updater.
+- `BaseURIUpdated`: fantasy squad NFT metadata base URI and updater.
+- `LegacyPassportMinted`: user, passport token ID, minter.
+- `LegacyEntryRecorded`: user, passport token ID, entry count, first joined time, last activity time.
+- `LegacyWinRecorded`: user, passport token ID, win count, last activity time.
+- `LegacyRewardRecorded`: user, passport token ID, claimed amount, lifetime claimed rewards, last activity time.
+- `LegacyPassportBaseURIUpdated`: passport metadata base URI and updater.
+
+Scoring events:
+
+- `PlayerStatsRecorded`: match ID, player ID, flattened raw cricket stat fields, computed signed fantasy points.
+- `PlayerPointsComputed`: match ID, player ID, computed signed fantasy points.
+- `MatchStatsSubmitted`: match ID, submitted player count, publisher.
+
+Contest and payout events:
+
+- `ContestCreated`: contest ID, match ID, entry fee, entry caps, operator.
+- `ContestJoined`: contest ID, match ID, user, squad token ID, passport token ID, entry index.
+- `EntryScoreComputed`: contest ID, match ID, user, entry index, squad token ID, signed squad score.
+- `ContestWinnerRecorded`: contest ID, match ID, user, rank, entry index, squad token ID, signed score, reward.
+- `TreasuryAccrued`: contest ID, match ID, fee amount, new treasury claimable amount.
+- `ContestFinalized`: contest ID, match ID, winner indexes, rewards, total entries, prize pool, treasury fee, operator.
+- `RefundCredited`: contest ID, match ID, user, squad token ID, entry index, refund amount, new refundable amount.
+- `ContestCancelled`: contest ID, match ID, refunded entries, total refund amount, operator.
+- `RewardClaimed`: user and reward amount.
+- `RefundClaimed`: user and refund amount.
+- `TreasuryUpdated`: previous treasury, new treasury, updater.
+- `TreasuryClaimed`: treasury, amount, claimer.
+
+Recommended indexer model:
+
+- Treat `MatchPlayersSet` as a full replacement of a match player pool.
+- Treat `PlayerStatsRecorded` as the canonical raw-stat and player-point delta.
+- Treat `EntryScoreComputed` as the per-entry score source after finalization.
+- Treat `ContestWinnerRecorded`, `TreasuryAccrued`, and `RefundCredited` as balance-credit deltas.
+- Treat `RewardClaimed`, `RefundClaimed`, and `TreasuryClaimed` as balance-debit deltas.
 
 ## Deployment Scripts
 

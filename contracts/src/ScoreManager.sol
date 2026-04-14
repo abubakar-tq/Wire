@@ -13,7 +13,7 @@ import {
     TooManyPlayers,
     ZeroAddress
 } from "./errors/Errors.sol";
-import {MatchStatsSubmitted, PlayerPointsComputed} from "./events/Events.sol";
+import {MatchStatsSubmitted, PlayerPointsComputed, PlayerStatsRecorded} from "./events/Events.sol";
 import {ScoringRules} from "./lib/ScoringRules.sol";
 
 contract ScoreManager is AccessControl {
@@ -55,11 +55,28 @@ contract ScoreManager is AccessControl {
             int32 points = ScoringRules.calculate(playerStats);
             _rawStatsByMatch[matchId][playerId] = playerStats;
             _playerPointsByMatch[matchId][playerId] = points;
+            emit PlayerStatsRecorded(
+                matchId,
+                playerId,
+                playerStats.runs,
+                playerStats.fours,
+                playerStats.sixes,
+                playerStats.wickets,
+                playerStats.maidens,
+                playerStats.catches,
+                playerStats.stumpings,
+                playerStats.runOutDirect,
+                playerStats.runOutIndirect,
+                playerStats.duck,
+                playerStats.inStartingXI,
+                playerStats.substituteAppearance,
+                points
+            );
             emit PlayerPointsComputed(matchId, playerId, points);
         }
 
         matchRegistry.updateMatchStatus(matchId, MatchStatus.StatsSubmitted);
-        emit MatchStatsSubmitted(matchId, playerIds.length);
+        emit MatchStatsSubmitted(matchId, playerIds.length, msg.sender);
     }
 
     function getPlayerPoints(uint256 matchId, uint16 playerId) external view returns (int32) {

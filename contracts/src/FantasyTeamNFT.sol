@@ -56,7 +56,7 @@ contract FantasyTeamNFT is ERC721, AccessControl {
         });
         _safeMint(to, tokenId);
 
-        emit SquadMinted(tokenId, to, matchId, playerIds, captainId, viceCaptainId);
+        emit SquadMinted(tokenId, to, matchId, playerIds, captainId, viceCaptainId, msg.sender);
     }
 
     function updateSquad(uint256 tokenId, uint16[11] calldata playerIds, uint16 captainId, uint16 viceCaptainId)
@@ -72,12 +72,12 @@ contract FantasyTeamNFT is ERC721, AccessControl {
         squad.captainId = captainId;
         squad.viceCaptainId = viceCaptainId;
 
-        emit SquadUpdated(tokenId, squad.matchId, playerIds, captainId, viceCaptainId);
+        emit SquadUpdated(tokenId, squad.matchId, playerIds, captainId, viceCaptainId, msg.sender);
     }
 
     function setBaseURI(string calldata baseUri_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _baseTokenUri = baseUri_;
-        emit BaseURIUpdated(baseUri_);
+        emit BaseURIUpdated(baseUri_, msg.sender);
     }
 
     function getSquad(uint256 tokenId) external view returns (Squad memory) {

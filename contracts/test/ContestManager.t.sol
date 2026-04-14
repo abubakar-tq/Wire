@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {FantasyArenaTestBase} from "./FantasyArenaTestBase.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {
     ContestAlreadyExists,
     ContestFull,
@@ -17,6 +18,18 @@ import {
 import {Contest, Entry, MatchStatus} from "../src/types/Structs.sol";
 
 contract ContestManagerTest is FantasyArenaTestBase {
+    bytes32 private constant ENTRY_SCORE_COMPUTED_TOPIC =
+        keccak256("EntryScoreComputed(uint256,uint256,address,uint16,uint256,int32)");
+    bytes32 private constant CONTEST_WINNER_RECORDED_TOPIC =
+        keccak256("ContestWinnerRecorded(uint256,uint256,address,uint8,uint16,uint256,int32,uint256)");
+    bytes32 private constant CONTEST_FINALIZED_TOPIC =
+        keccak256("ContestFinalized(uint256,uint256,uint16[3],uint256[3],uint16,uint256,uint256,address)");
+    bytes32 private constant REFUND_CREDITED_TOPIC =
+        keccak256("RefundCredited(uint256,uint256,address,uint256,uint16,uint256,uint256)");
+    bytes32 private constant CONTEST_CANCELLED_TOPIC =
+        keccak256("ContestCancelled(uint256,uint256,uint256,uint256,address)");
+    bytes32 private constant TREASURY_ACCRUED_TOPIC = keccak256("TreasuryAccrued(uint256,uint256,uint256,uint256)");
+
     function testCreateContestSuccess() public {
         _createMatchWithPlayers();
         _createContest();
@@ -146,6 +159,24 @@ contract ContestManagerTest is FantasyArenaTestBase {
         assertEq(uint8(registry.getMatch(MATCH_ID).status), uint8(MatchStatus.Finalized));
     }
 
+    function testFinalizeEmitsIndexerEvents() public {
+        _createMatchWithPlayers();
+        _createContest();
+        _join(alice, _validSquad());
+        _join(bob, _alternateSquad());
+        _join(carol, _higherSquad());
+        _submitLinearStats(MATCH_ID);
+
+        vm.recordLogs();
+        contests.finalizeContest(CONTEST_ID);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(_countLogsByTopic(logs, ENTRY_SCORE_COMPUTED_TOPIC), 3);
+        assertEq(_countLogsByTopic(logs, CONTEST_WINNER_RECORDED_TOPIC), 3);
+        assertEq(_countLogsByTopic(logs, TREASURY_ACCRUED_TOPIC), 1);
+        assertEq(_countLogsByTopic(logs, CONTEST_FINALIZED_TOPIC), 1);
+    }
+
     function testTieBreakerBehavior() public {
         _createMatchWithPlayers();
         _createContest();
@@ -199,6 +230,20 @@ contract ContestManagerTest is FantasyArenaTestBase {
         contests.claimRefund();
     }
 
+    function testCancelEmitsRefundIndexerEvents() public {
+        _createMatchWithPlayers();
+        _createContest();
+        _join(alice, _validSquad());
+        _join(bob, _alternateSquad());
+
+        vm.recordLogs();
+        contests.cancelContest(CONTEST_ID);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(_countLogsByTopic(logs, REFUND_CREDITED_TOPIC), 2);
+        assertEq(_countLogsByTopic(logs, CONTEST_CANCELLED_TOPIC), 1);
+    }
+
     function testClaimTreasury() public {
         _createMatchWithPlayers();
         _createContest();
@@ -218,5 +263,13 @@ contract ContestManagerTest is FantasyArenaTestBase {
 
         Entry memory entry = contests.getEntry(CONTEST_ID, 0);
         assertEq(entry.score, int32(118));
+    }
+
+    function _countLogsByTopic(Vm.Log[] memory logs, bytes32 topic0) private pure returns (uint256 count) {
+        for (uint256 i = 0; i < logs.length; ++i) {
+            if (logs[i].topics[0] == topic0) {
+                ++count;
+            }
+        }
     }
 }

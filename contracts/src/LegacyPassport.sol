@@ -53,7 +53,7 @@ contract LegacyPassport is ERC721, AccessControl {
         stats.lastActiveAt = uint64(block.timestamp);
         ++stats.contestsEntered;
 
-        emit LegacyEntryRecorded(user, tokenId, stats.contestsEntered);
+        emit LegacyEntryRecorded(user, tokenId, stats.contestsEntered, stats.firstJoinedAt, stats.lastActiveAt);
     }
 
     function recordWin(address user) external onlyRole(RECORDER_ROLE) {
@@ -62,7 +62,7 @@ contract LegacyPassport is ERC721, AccessControl {
         stats.lastActiveAt = uint64(block.timestamp);
         ++stats.contestsWon;
 
-        emit LegacyWinRecorded(user, tokenId, stats.contestsWon);
+        emit LegacyWinRecorded(user, tokenId, stats.contestsWon, stats.lastActiveAt);
     }
 
     function recordRewardClaim(address user, uint256 amount) external onlyRole(RECORDER_ROLE) {
@@ -71,12 +71,12 @@ contract LegacyPassport is ERC721, AccessControl {
         stats.lastActiveAt = uint64(block.timestamp);
         stats.totalRewardsClaimed += amount;
 
-        emit LegacyRewardRecorded(user, tokenId, amount, stats.totalRewardsClaimed);
+        emit LegacyRewardRecorded(user, tokenId, amount, stats.totalRewardsClaimed, stats.lastActiveAt);
     }
 
     function setBaseURI(string calldata baseUri_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _baseTokenUri = baseUri_;
-        emit LegacyPassportBaseURIUpdated(baseUri_);
+        emit LegacyPassportBaseURIUpdated(baseUri_, msg.sender);
     }
 
     function hasPassport(address user) external view returns (bool) {
@@ -122,7 +122,7 @@ contract LegacyPassport is ERC721, AccessControl {
         _passportOf[to] = tokenId;
         _mint(to, tokenId);
 
-        emit LegacyPassportMinted(to, tokenId);
+        emit LegacyPassportMinted(to, tokenId, msg.sender);
     }
 
     function _requirePassport(address user) private view returns (uint256 tokenId) {
