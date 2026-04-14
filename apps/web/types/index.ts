@@ -10,6 +10,7 @@ export interface CricketPlayer {
   name: string;
   team: Team;
   role: Role;
+  imageUrl?: string;
   credits: number;
   selPct: number;
   fantasyPoints: number;

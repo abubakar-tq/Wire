@@ -1,4 +1,5 @@
 import { formatEther, parseEther, stringToHex } from "viem";
+import { getPlayerMetadata } from "@/lib/playerMetadata";
 
 export const MATCH_STATUS_LABELS = ["Scheduled", "Locked", "StatsSubmitted", "Finalized", "Cancelled"] as const;
 export const PLAYER_ROLE_LABELS = ["WK", "BAT", "AR", "BOWL"] as const;
@@ -88,7 +89,7 @@ export function toUnixSeconds(value: string): bigint {
 }
 
 export function safePlayerName(playerId: number): string {
-  return `Player ${playerId}`;
+  return getPlayerMetadata(playerId)?.name ?? `Player ${playerId}`;
 }
 
 export function teamCodeFromBytes(value: `0x${string}` | string | null | undefined, fallback: string): string {

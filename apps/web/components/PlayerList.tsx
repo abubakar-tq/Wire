@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Search, Plus } from 'lucide-react';
 import { CricketPlayer } from '@/types/index';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const ROLE_LABELS: Record<string, string> = {
   WK: 'Wicket Keeper',
@@ -110,7 +111,13 @@ export function PlayerList({ availablePlayers, onSelectPlayer, creditsUsed }: Pl
               onClick={() => onSelectPlayer(player)}
               className="w-full text-left p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:shadow-sm transition-all active:scale-95"
             >
-              <div className="flex items-start justify-between gap-2 mb-1">
+              <div className="flex items-start gap-2 mb-1">
+                <Avatar className="size-9">
+                  {player.imageUrl ? <AvatarImage src={player.imageUrl} alt={player.name} /> : null}
+                  <AvatarFallback className="bg-slate-900 text-white text-xs font-semibold">
+                    {player.name.slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-slate-900 text-xs md:text-sm truncate">{player.name}</p>
                   <p className="text-xs text-slate-600">{ROLE_LABELS[player.role]}</p>

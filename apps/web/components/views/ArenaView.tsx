@@ -6,6 +6,7 @@ import { AlertCircle, ChevronDown, Lock, Plus, Sparkles, Trash2 } from 'lucide-r
 import type { CricketPlayer, Squad } from '@/types/index';
 import type { IndexedContest } from '@/api/indexerClient';
 import { PlayerList } from '@/components/PlayerList';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatWire } from '@/utils/arenaFormat';
 
 interface ArenaViewProps {
@@ -326,9 +327,12 @@ function SquadSlot({
 
   return (
     <div className="w-[8.5rem] rounded-xl border border-slate-200 bg-white p-3 text-center shadow-sm">
-      <div className="mx-auto h-10 w-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-bold">
-        {player.name.slice(0, 1)}
-      </div>
+      <Avatar className="mx-auto size-10">
+        {player.imageUrl ? <AvatarImage src={player.imageUrl} alt={player.name} /> : null}
+        <AvatarFallback className="bg-slate-900 text-white text-sm font-bold">
+          {player.name.slice(0, 1).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
       <p className="mt-2 truncate text-sm font-semibold text-slate-900">{player.name}</p>
       <p className="mt-0.5 truncate text-xs text-slate-500">{player.team}</p>
       <div className="mt-2 flex items-center justify-center gap-1 text-[11px]">
