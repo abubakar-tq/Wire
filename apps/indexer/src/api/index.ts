@@ -22,7 +22,7 @@ import { getAddress, isAddress } from "viem";
 
 const app = new Hono();
 
-app.get("/health", (c) =>
+app.get("/healthz", (c) =>
   json(c, {
     ok: true,
     service: "wirefluid-indexer"

@@ -16,7 +16,7 @@ The indexer workspace is `apps/indexer`.
 - Storage: Postgres through `DATABASE_URL`.
 - API:
   - GraphQL: served by Ponder.
-  - `GET /health`: liveness endpoint.
+  - `GET /healthz`: liveness endpoint.
   - `GET /summary`: small dashboard summary endpoint.
 
 The indexer consumes events from:
