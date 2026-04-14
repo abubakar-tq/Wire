@@ -2,6 +2,11 @@
 pragma solidity ^0.8.26;
 
 import {FantasyArenaTestBase} from "./FantasyArenaTestBase.sol";
+import {ContestManager} from "../src/ContestManager.sol";
+import {IFantasyTeamNFT} from "../src/interfaces/IFantasyTeamNFT.sol";
+import {ILegacyPassport} from "../src/interfaces/ILegacyPassport.sol";
+import {IMatchRegistry} from "../src/interfaces/IMatchRegistry.sol";
+import {IScoreManager} from "../src/interfaces/IScoreManager.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {
     ContestAlreadyExists,
@@ -29,6 +34,20 @@ contract ContestManagerTest is FantasyArenaTestBase {
     bytes32 private constant CONTEST_CANCELLED_TOPIC =
         keccak256("ContestCancelled(uint256,uint256,uint256,uint256,address)");
     bytes32 private constant TREASURY_ACCRUED_TOPIC = keccak256("TreasuryAccrued(uint256,uint256,uint256,uint256)");
+    bytes32 private constant TREASURY_UPDATED_TOPIC = keccak256("TreasuryUpdated(address,address,address)");
+
+    function testConstructorEmitsInitialTreasuryState() public {
+        vm.recordLogs();
+        new ContestManager(
+            IMatchRegistry(address(registry)),
+            IFantasyTeamNFT(address(nft)),
+            IScoreManager(address(scores)),
+            ILegacyPassport(address(passport))
+        );
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(_countLogsByTopic(logs, TREASURY_UPDATED_TOPIC), 1);
+    }
 
     function testCreateContestSuccess() public {
         _createMatchWithPlayers();

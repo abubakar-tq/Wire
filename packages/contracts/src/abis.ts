@@ -24,15 +24,20 @@ export const matchRegistryAbi = parseAbi([
 ]);
 
 export const fantasyTeamNftAbi = parseAbi([
+  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
   "event SquadMinted(uint256 indexed tokenId, address indexed owner, uint256 indexed matchId, uint16[11] playerIds, uint16 captainId, uint16 viceCaptainId, address minter)",
   "event SquadUpdated(uint256 indexed tokenId, uint256 indexed matchId, uint16[11] playerIds, uint16 captainId, uint16 viceCaptainId, address indexed updatedBy)",
   "event BaseURIUpdated(string baseURI, address indexed updater)",
   "function MINTER_ROLE() view returns (bytes32)",
+  "function matchRegistry() view returns (address)",
+  "function nextTokenId() view returns (uint256)",
   "function setBaseURI(string baseUri)",
+  "function updateSquad(uint256 tokenId, uint16[11] playerIds, uint16 captainId, uint16 viceCaptainId)",
   "function getSquad(uint256 tokenId) view returns ((uint256 matchId, uint16[11] playerIds, uint16 captainId, uint16 viceCaptainId, bool exists))",
   "function squadMatchId(uint256 tokenId) view returns (uint256)",
   "function isSquadLocked(uint256 tokenId) view returns (bool)",
   "function isTransferLocked(uint256 tokenId) view returns (bool)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
   "function tokenURI(uint256 tokenId) view returns (string)",
   ...accessControlAbiItems
 ]);
@@ -80,6 +85,10 @@ export const contestManagerAbi = parseAbi([
   "event TreasuryAccrued(uint256 indexed contestId, uint256 indexed matchId, uint256 amount, uint256 newTreasuryClaimable)",
   "event TreasuryClaimed(address indexed treasury, uint256 amount, address indexed claimer)",
   "function OPERATOR_ROLE() view returns (bytes32)",
+  "function matchRegistry() view returns (address)",
+  "function fantasyTeamNFT() view returns (address)",
+  "function scoreManager() view returns (address)",
+  "function legacyPassport() view returns (address)",
   "function createContest(uint256 contestId, uint256 matchId, uint96 entryFee, uint16 maxEntries, uint8 maxEntriesPerWallet)",
   "function joinContest(uint256 contestId, uint16[11] playerIds, uint16 captainId, uint16 viceCaptainId) payable returns (uint256)",
   "function finalizeContest(uint256 contestId)",
@@ -90,6 +99,10 @@ export const contestManagerAbi = parseAbi([
   "function setTreasury(address newTreasury)",
   "function treasury() view returns (address)",
   "function treasuryClaimable() view returns (uint256)",
+  "function contestIdByMatch(uint256 matchId) view returns (uint256)",
+  "function entriesByWallet(uint256 contestId, address user) view returns (uint8)",
+  "function claimableRewards(address user) view returns (uint256)",
+  "function refundableEntries(address user) view returns (uint256)",
   "function getContest(uint256 contestId) view returns ((uint256 matchId, uint96 entryFee, uint16 maxEntries, uint8 maxEntriesPerWallet, uint16 totalEntries, bool finalized, bool cancelled, bool exists))",
   "function getEntry(uint256 contestId, uint256 entryIndex) view returns ((address user, uint256 tokenId, int32 score, uint64 joinedAt))",
   "function getEntryCount(uint256 contestId) view returns (uint256)",

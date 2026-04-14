@@ -94,6 +94,8 @@ contract ContestManager is AccessControl, ReentrancyGuard {
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(OPERATOR_ROLE, msg.sender);
+
+        emit TreasuryUpdated(address(0), msg.sender, msg.sender);
     }
 
     function createContest(
