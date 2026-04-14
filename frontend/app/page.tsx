@@ -64,11 +64,17 @@ export default function Page() {
   };
 
   return (
-    <div className="bg-[#FAFAFA]">
+    <div className="bg-white">
       <Navbar state={state} />
-      <div className="flex h-[calc(100vh-73px)]">
-        <Sidebar state={state} onViewChange={actions.setActiveView} />
-        {renderView()}
+      <div className="flex h-[calc(100vh-73px)] flex-col md:flex-row">
+        {/* Sidebar - Hidden on mobile, shown on md+ */}
+        <div className="hidden md:block md:w-64 lg:w-64 bg-white border-r border-slate-200 overflow-y-auto">
+          <Sidebar state={state} onViewChange={actions.setActiveView} />
+        </div>
+        {/* Main Content */}
+        <div className="flex-1 overflow-hidden">
+          {renderView()}
+        </div>
       </div>
 
       {/* Global Styles for Animations */}

@@ -26,33 +26,33 @@ export function PlayerList({ availablePlayers, onSelectPlayer, creditsUsed }: Pl
   }, [availablePlayers, searchQuery, selectedRole, selectedTeam]);
 
   return (
-    <div className="w-96 bg-white border-r border-[#E5E7EB] p-6 overflow-y-auto h-[calc(100vh-73px)]">
-      <h2 className="text-lg font-bold text-[#0F1117] mb-4">Available Players</h2>
+    <div className="w-full lg:w-80 xl:w-96 bg-white border-r border-slate-200 p-3 md:p-4 overflow-y-auto">
+      <h2 className="text-base md:text-lg font-bold text-slate-900 mb-3">Available Players</h2>
 
       {/* Search */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-3 w-4 h-4 text-[#4B5563]" />
+      <div className="relative mb-3">
+        <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
         <input
           type="text"
-          placeholder="Search players..."
+          placeholder="Search..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 rounded-lg border border-[#E5E7EB] bg-[#FAFAFA] text-[#0F1117] placeholder-[#4B5563] text-sm"
+          className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
         />
       </div>
 
       {/* Role Filter */}
-      <div className="mb-4">
-        <p className="text-xs font-semibold text-[#4B5563] mb-2">ROLE</p>
-        <div className="flex gap-2 flex-wrap">
+      <div className="mb-2.5">
+        <p className="text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Role</p>
+        <div className="flex gap-1.5 flex-wrap">
           {['WK', 'BAT', 'AR', 'BOWL'].map((role) => (
             <button
               key={role}
               onClick={() => setSelectedRole(selectedRole === role ? null : role)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
                 selectedRole === role
-                  ? 'bg-[#10B981] text-white'
-                  : 'bg-[#E5E7EB] text-[#4B5563] hover:bg-[#D1D5DB]'
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
               {role}
@@ -62,15 +62,15 @@ export function PlayerList({ availablePlayers, onSelectPlayer, creditsUsed }: Pl
       </div>
 
       {/* Team Filter */}
-      <div className="mb-6">
-        <p className="text-xs font-semibold text-[#4B5563] mb-2">TEAM</p>
-        <div className="flex gap-2 flex-wrap">
+      <div className="mb-3">
+        <p className="text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Team</p>
+        <div className="flex gap-1 flex-wrap">
           {['KK', 'LQ', 'IU', 'PZ', 'MS', 'QG'].map((team) => (
             <button
               key={team}
               onClick={() => setSelectedTeam(selectedTeam === team ? null : team)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                selectedTeam === team ? 'bg-[#2563EB] text-white' : 'bg-[#E5E7EB] text-[#4B5563] hover:bg-[#D1D5DB]'
+              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                selectedTeam === team ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
               {team}
@@ -80,47 +80,44 @@ export function PlayerList({ availablePlayers, onSelectPlayer, creditsUsed }: Pl
       </div>
 
       {/* Budget Info */}
-      <div className="bg-[#FAFAFA] border border-[#E5E7EB] rounded-lg p-3 mb-4">
-        <p className="text-xs text-[#4B5563] mb-1">TOTAL CREDITS</p>
-        <div className="flex items-baseline gap-1">
-          <span className="text-xl font-bold text-[#0F1117] tabular-nums">{creditsUsed}</span>
-          <span className="text-sm text-[#4B5563]">/ 100</span>
+      <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 mb-3">
+        <p className="text-xs text-slate-600 mb-1 font-semibold uppercase tracking-wide">Credits Used</p>
+        <div className="flex items-baseline gap-1 mb-2">
+          <span className="text-lg font-bold text-slate-900 tabular-nums">{creditsUsed}</span>
+          <span className="text-xs text-slate-600">/ 100</span>
         </div>
-        <div className="w-full bg-[#E5E7EB] rounded-full h-2 mt-2">
-          <div className="bg-[#10B981] h-2 rounded-full transition-all" style={{ width: `${creditsUsed}%` }} />
+        <div className="w-full bg-slate-200 rounded-full h-1.5">
+          <div className="bg-teal-600 h-1.5 rounded-full transition-all" style={{ width: `${creditsUsed}%` }} />
         </div>
       </div>
 
-      {/* Players List */}
-      <div className="space-y-2">
+      {/* Players List - Compact */}
+      <div className="space-y-1.5">
         {filteredPlayers.length > 0 ? (
           filteredPlayers.map((player) => (
             <button
               key={player.id}
               onClick={() => onSelectPlayer(player)}
-              className="w-full text-left p-3 rounded-lg border border-[#E5E7EB] bg-white hover:bg-[#FAFAFA] hover:shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full text-left p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:shadow-sm transition-all active:scale-95"
             >
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <p className="font-semibold text-[#0F1117] text-sm">{player.name}</p>
-                  <p className="text-xs text-[#4B5563]">{ROLE_LABELS[player.role]}</p>
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-slate-900 text-xs md:text-sm truncate">{player.name}</p>
+                  <p className="text-xs text-slate-600">{ROLE_LABELS[player.role]}</p>
                 </div>
-                <Plus className="w-4 h-4 text-[#10B981]" />
+                <Plus className="w-3.5 h-3.5 text-teal-600 flex-shrink-0 mt-0.5" />
               </div>
-              <div className="flex items-center justify-between">
-                <span className={`${TEAM_COLORS[player.team]} text-white text-xs px-2 py-1 rounded font-medium`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${TEAM_COLORS[player.team]} text-white text-xs px-1.5 py-0.5 rounded font-medium`}>
                   {player.team}
                 </span>
-                <span className="text-sm font-bold text-[#0F1117]">{player.credits}C</span>
-              </div>
-              <div className="flex gap-2 mt-2 text-xs">
-                <span className="text-[#4B5563]">Sel: {player.selPct}%</span>
+                <span className="text-xs font-bold text-slate-900">{player.credits}C</span>
               </div>
             </button>
           ))
         ) : (
-          <div className="text-center py-8">
-            <p className="text-[#4B5563] text-sm">No players match filters</p>
+          <div className="text-center py-6">
+            <p className="text-slate-600 text-xs">No matching players</p>
           </div>
         )}
       </div>

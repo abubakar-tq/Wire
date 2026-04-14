@@ -4,39 +4,57 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Modern, lightweight fintech color palette */
+  --background: #FFFFFF;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  
+  /* Primary - Teal/Cyan for trust and finance */
+  --primary: #0D9488;
+  --primary-foreground: #FFFFFF;
+  
+  /* Secondary - Light gray backgrounds */
+  --secondary: #F8FAFC;
+  --secondary-foreground: #475569;
+  
+  /* Muted - Subtle interactions */
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  
+  /* Accent - Emerald for positive actions */
+  --accent: #059669;
+  --accent-foreground: #FFFFFF;
+  
+  /* Destructive - Red for errors */
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  
+  /* Borders - Subtle dividers */
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #0D9488;
+  
+  /* Chart colors - Modern, muted */
+  --chart-1: #0D9488;
+  --chart-2: #3B82F6;
+  --chart-3: #8B5CF6;
+  --chart-4: #EC4899;
+  --chart-5: #F59E0B;
+  
+  --radius: 0.5rem;
+  
+  /* Sidebar */
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #0F172A;
+  --sidebar-primary: #0D9488;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F1F5F9;
+  --sidebar-accent-foreground: #0D9488;
+  --sidebar-border: #E2E8F0;
+  --sidebar-ring: #0D9488;
 }
 
 .dark {

@@ -36,22 +36,22 @@ export function DashboardView({ state }: DashboardViewProps) {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto h-[calc(100vh-73px)] bg-gradient-to-br from-[#FAFAFA] via-white to-[#F0FDF4]/30">
+    <div className="flex-1 overflow-y-auto h-[calc(100vh-73px)] bg-white">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6">
         {/* Header Section */}
-        <div className="mb-8 animate-fade-in-up">
-          <h1 className="text-4xl md:text-5xl font-bold text-[#0F1117] mb-2">Welcome Back</h1>
-          <p className="text-[#5B6B7A] text-lg">Your fantasy sports dashboard</p>
+        <div className="mb-4 animate-fade-in-up">
+          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-1">Welcome Back</h1>
+          <p className="text-slate-600 text-sm">Your fantasy sports dashboard</p>
         </div>
 
         {/* KPI Cards - Staggered Animation */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-3 mb-5">
           {[
-            { icon: Trophy, label: 'Rank', value: `#${userRank}`, subtext: 'Global Leaderboard', color: '#F5A623', delay: 0 },
-            { icon: TrendingUp, label: 'Points', value: userPoints.toLocaleString(), subtext: 'Season Total', color: '#10B981', delay: 100 },
-            { icon: Zap, label: 'Squad', value: state.squad.players.length, subtext: 'Players', color: '#8B5CF6', delay: 200 },
-            { icon: Gift, label: 'Balance', value: `◈ ${state.wireBalance.toLocaleString()}`, subtext: 'Available', color: '#F5A623', delay: 300 },
+            { icon: Trophy, label: 'Rank', value: `#${userRank}`, subtext: 'Global', color: '#F59E0B', delay: 0 },
+            { icon: TrendingUp, label: 'Points', value: userPoints.toLocaleString(), subtext: 'Total', color: '#10B981', delay: 50 },
+            { icon: Zap, label: 'Squad', value: state.squad.players.length, subtext: 'Players', color: '#8B5CF6', delay: 100 },
+            { icon: Gift, label: 'Balance', value: state.wireBalance.toLocaleString(), subtext: 'Available', color: '#F59E0B', delay: 150 },
           ].map((kpi, idx) => {
             const Icon = kpi.icon;
             return (
@@ -60,15 +60,15 @@ export function DashboardView({ state }: DashboardViewProps) {
                 className="animate-fade-in-up"
                 style={{ animationDelay: `${kpi.delay}ms` }}
               >
-                <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-card hover:shadow-elevated transition-smooth group hover:-translate-y-1">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`w-10 h-10 rounded-lg`} style={{ backgroundColor: `${kpi.color}15` }}>
-                      <Icon className="w-10 h-10 p-2" style={{ color: kpi.color }} />
+                <div className="bg-white border border-slate-200 rounded-lg p-3 md:p-4 hover:shadow-sm transition-smooth group">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-slate-100" style={{ backgroundColor: `${kpi.color}15` }}>
+                      <Icon className="w-8 h-8 p-1.5" style={{ color: kpi.color }} />
                     </div>
-                    <span className="text-xs font-bold text-[#5B6B7A] uppercase">{kpi.label}</span>
+                    <span className="text-xs font-bold text-slate-600 uppercase">{kpi.label}</span>
                   </div>
-                  <p className="text-3xl font-bold text-[#0F1117] mb-1 tabular-nums">{kpi.value}</p>
-                  <p className="text-xs text-[#5B6B7A]">{kpi.subtext}</p>
+                  <p className="text-xl md:text-2xl font-bold text-slate-900 mb-0.5 tabular-nums">{kpi.value}</p>
+                  <p className="text-xs text-slate-600">{kpi.subtext}</p>
                 </div>
               </div>
             );
@@ -76,22 +76,22 @@ export function DashboardView({ state }: DashboardViewProps) {
         </div>
 
         {/* Earnings Chart Section - Collapsible */}
-        <div className="animate-fade-in-up" style={{ animationDelay: '400ms' }}>
+        <div className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
           <button
             onClick={() => toggleSection('earnings')}
-            className="w-full bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-card hover:shadow-elevated transition-smooth text-left group mb-8"
+            className="w-full bg-white border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-smooth text-left group mb-3"
           >
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-[#0F1117] mb-1">Weekly Earnings</h2>
-                <p className="text-sm text-[#5B6B7A]">Total: <span className="text-[#F5A623] font-bold">◈ {totalEarnings}</span></p>
+                <h2 className="text-base md:text-lg font-bold text-slate-900 mb-0.5">Weekly Earnings</h2>
+                <p className="text-xs md:text-sm text-slate-600">Total: <span className="text-amber-600 font-bold">{totalEarnings}</span></p>
               </div>
-              <ChevronDown className={`w-5 h-5 text-[#5B6B7A] transition-smooth ${expandedSections.earnings ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-slate-600 transition-smooth ${expandedSections.earnings ? 'rotate-180' : ''}`} />
             </div>
           </button>
 
           {expandedSections.earnings && (
-            <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-card mb-8 animate-slide-down">
+            <div className="bg-white border border-slate-200 rounded-lg p-4 mb-4 animate-slide-down">
               <div className="flex items-end gap-1.5 h-40">
                 {earningsData.map((data, idx) => (
                   <div
@@ -120,46 +120,46 @@ export function DashboardView({ state }: DashboardViewProps) {
         </div>
 
         {/* Main Grid - Actions & Match Status */}
-        <div className="grid md:grid-cols-2 gap-8 mb-8">
+        <div className="grid md:grid-cols-2 gap-3 md:gap-4 mb-4">
           {/* Quick Actions */}
-          <div className="animate-fade-in-up" style={{ animationDelay: '500ms' }}>
+          <div className="animate-fade-in-up" style={{ animationDelay: '250ms' }}>
             <button
               onClick={() => toggleSection('actions')}
-              className="w-full bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-card hover:shadow-elevated transition-smooth text-left group mb-4"
+              className="w-full bg-white border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-smooth text-left group mb-2"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-[#0F1117]">Quick Actions</h2>
-                <ChevronDown className={`w-5 h-5 text-[#5B6B7A] transition-smooth ${expandedSections.actions ? 'rotate-180' : ''}`} />
+                <h2 className="text-base md:text-lg font-bold text-slate-900">Quick Actions</h2>
+                <ChevronDown className={`w-4 h-4 text-slate-600 transition-smooth ${expandedSections.actions ? 'rotate-180' : ''}`} />
               </div>
             </button>
 
             {expandedSections.actions && (
-              <div className="space-y-2 animate-slide-down">
+              <div className="space-y-1.5 animate-slide-down">
                 {[
-                  { label: 'Start New Arena', desc: 'Build a new squad', icon: Zap, color: '#10B981' },
-                  { label: 'Claim Rewards', desc: 'View earnings', icon: Gift, color: '#F5A623' },
-                  { label: 'NFT Portfolio', desc: 'Your squad cards', icon: Trophy, color: '#8B5CF6' },
+                  { label: 'New Arena', desc: 'Build squad', icon: Zap, color: '#10B981' },
+                  { label: 'Rewards', desc: 'View earnings', icon: Gift, color: '#F59E0B' },
+                  { label: 'NFT Cards', desc: 'Squad NFTs', icon: Trophy, color: '#8B5CF6' },
                 ].map((action, idx) => {
                   const Icon = action.icon;
                   return (
                     <button
                       key={idx}
-                      className="w-full p-4 rounded-lg bg-white border border-[#E5E7EB] hover:border-[#10B981] transition-smooth group flex items-center justify-between shadow-card hover:shadow-elevated"
+                      className="w-full p-3 rounded-lg bg-white border border-slate-200 hover:border-teal-300 transition-smooth group flex items-center justify-between"
                       style={{
-                        animation: `fadeInUp 0.4s ease-out ${idx * 100}ms forwards`,
+                        animation: `fadeInUp 0.4s ease-out ${idx * 50}ms forwards`,
                         opacity: 0,
                       }}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: `${action.color}15` }}>
-                          <Icon className="w-8 h-8 p-2" style={{ color: action.color }} />
+                      <div className="flex items-center gap-2 flex-1">
+                        <div className="w-7 h-7 rounded-lg flex-shrink-0" style={{ backgroundColor: `${action.color}15` }}>
+                          <Icon className="w-7 h-7 p-1.5" style={{ color: action.color }} />
                         </div>
-                        <div className="text-left">
-                          <p className="font-semibold text-[#0F1117]">{action.label}</p>
-                          <p className="text-xs text-[#5B6B7A]">{action.desc}</p>
+                        <div className="text-left min-w-0">
+                          <p className="text-xs md:text-sm font-semibold text-slate-900 truncate">{action.label}</p>
+                          <p className="text-xs text-slate-600 truncate">{action.desc}</p>
                         </div>
                       </div>
-                      <ArrowUpRight className="w-4 h-4 text-[#5B6B7A] group-hover:text-[#10B981] transition-smooth" />
+                      <ArrowUpRight className="w-3.5 h-3.5 text-slate-600 flex-shrink-0 ml-1" />
                     </button>
                   );
                 })}
@@ -168,10 +168,10 @@ export function DashboardView({ state }: DashboardViewProps) {
           </div>
 
           {/* Match Status */}
-          <div className="animate-fade-in-up" style={{ animationDelay: '600ms' }}>
-            <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-card hover:shadow-elevated transition-smooth h-full">
-              <h2 className="text-lg font-bold text-[#0F1117] mb-4">Current Match</h2>
-              <div className="space-y-3">
+          <div className="animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+            <div className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-smooth">
+              <h2 className="text-base md:text-lg font-bold text-slate-900 mb-3">Current Match</h2>
+              <div className="space-y-2">
                 {[
                   { label: 'Match', value: 'KK vs MS', icon: '🏏' },
                   { label: 'Status', value: 'LIVE', icon: '🔴', live: true },
@@ -179,24 +179,24 @@ export function DashboardView({ state }: DashboardViewProps) {
                 ].map((item, idx) => (
                   <div
                     key={idx}
-                    className="p-3 bg-gradient-to-r from-[#FAFAFA] to-white rounded-lg border border-[#E5E7EB] flex items-center justify-between group hover:border-[#10B981] transition-smooth"
+                    className="p-2.5 bg-slate-50 rounded border border-slate-200 flex items-center justify-between group hover:bg-white transition-smooth text-sm"
                     style={{
-                      animation: `fadeInUp 0.4s ease-out ${idx * 100}ms forwards`,
+                      animation: `fadeInUp 0.3s ease-out ${idx * 50}ms forwards`,
                       opacity: 0,
                     }}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{item.icon}</span>
-                      <span className="text-sm text-[#5B6B7A] font-medium">{item.label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base">{item.icon}</span>
+                      <span className="text-xs md:text-sm text-slate-600 font-medium">{item.label}</span>
                     </div>
-                    <span className={`font-bold ${item.live ? 'text-[#EF4444] animate-pulse' : 'text-[#0F1117]'}`}>
+                    <span className={`font-bold text-xs md:text-sm ${item.live ? 'text-red-600 animate-pulse' : 'text-slate-900'}`}>
                       {item.value}
                     </span>
                   </div>
                 ))}
 
-                <div className="p-4 bg-gradient-to-r from-[#10B981]/5 to-transparent border border-[#10B981]/20 rounded-lg mt-4">
-                  <p className="text-sm text-[#0F1117] font-medium">Match is live and your squad is accumulating points in real-time. Check the leaderboard for live rankings.</p>
+                <div className="p-3 bg-teal-50 border border-teal-200 rounded mt-2 text-xs md:text-sm text-slate-900">
+                  <p className="font-medium">Your squad is live and accumulating points. Check leaderboard for rankings.</p>
                 </div>
               </div>
             </div>
@@ -204,35 +204,35 @@ export function DashboardView({ state }: DashboardViewProps) {
         </div>
 
         {/* Pro Tips - Collapsible */}
-        <div className="animate-fade-in-up" style={{ animationDelay: '700ms' }}>
+        <div className="animate-fade-in-up" style={{ animationDelay: '350ms' }}>
           <button
             onClick={() => toggleSection('tips')}
-            className="w-full bg-gradient-to-r from-[#8B5CF6]/10 to-[#2563EB]/10 border border-[#8B5CF6]/20 rounded-xl p-6 shadow-card hover:shadow-elevated transition-smooth text-left group"
+            className="w-full bg-purple-50 border border-purple-200 rounded-lg p-4 hover:shadow-sm transition-smooth text-left group"
           >
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-[#0F1117]">Pro Tips</h3>
-              <ChevronDown className={`w-5 h-5 text-[#5B6B7A] transition-smooth ${expandedSections.tips ? 'rotate-180' : ''}`} />
+              <h3 className="font-bold text-slate-900 text-base md:text-lg">Pro Tips</h3>
+              <ChevronDown className={`w-4 h-4 text-slate-600 transition-smooth ${expandedSections.tips ? 'rotate-180' : ''}`} />
             </div>
           </button>
 
           {expandedSections.tips && (
-            <div className="bg-gradient-to-r from-[#8B5CF6]/10 to-[#2563EB]/10 border border-[#8B5CF6]/20 border-t-0 rounded-b-xl p-6 animate-slide-down">
-              <ul className="space-y-2 text-sm text-[#0F1117]">
+            <div className="bg-purple-50 border border-purple-200 border-t-0 rounded-b-lg p-4 animate-slide-down">
+              <ul className="space-y-1.5 text-xs md:text-sm text-slate-900">
                 {[
-                  'Captain gets 2x points, Vice-Captain gets 1.5x points',
-                  'Balance your squad: mix high-form players with underdogs',
-                  'Use AI Insights to get real-time recommendations',
-                  'Check team composition before match starts',
+                  'Captain 2x, Vice-Captain 1.5x points',
+                  'Mix high-form players with underdogs',
+                  'Check team composition early',
+                  'Follow live leaderboard updates',
                 ].map((tip, idx) => (
                   <li
                     key={idx}
                     className="flex items-start gap-2"
                     style={{
-                      animation: `fadeInUp 0.4s ease-out ${idx * 100}ms forwards`,
+                      animation: `fadeInUp 0.3s ease-out ${idx * 50}ms forwards`,
                       opacity: 0,
                     }}
                   >
-                    <span className="text-[#10B981] font-bold mt-0.5">✓</span>
+                    <span className="text-teal-600 font-bold flex-shrink-0">✓</span>
                     <span>{tip}</span>
                   </li>
                 ))}
@@ -242,7 +242,7 @@ export function DashboardView({ state }: DashboardViewProps) {
         </div>
 
         {/* Spacer */}
-        <div className="h-8" />
+        <div className="h-4" />
       </div>
     </div>
   );
