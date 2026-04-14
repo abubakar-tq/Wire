@@ -1,6 +1,7 @@
 import { getContractAddresses, hasConfiguredAddresses } from "@wirefluid/contracts";
+import { publicEnv } from "@/config/publicEnv";
 
-export const contractAddresses = getContractAddresses(process.env, {
+export const contractAddresses = getContractAddresses(publicEnv, {
   publicPrefix: true,
   strict: false
 });

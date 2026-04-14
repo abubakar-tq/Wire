@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { ShieldCheck, Zap } from 'lucide-react';
+import { useAccount, useSwitchChain, useWalletClient } from 'wagmi';
 import type { AppState, ViewType } from '@/types/index';
 import type { RoleChecks } from '@/web3/useRoleChecks';
 import { shortAddress } from '@/utils/arenaFormat';
 import { useSiweSession } from '@/auth/useSiweSession';
+import { configuredChainId, wireFluidTestnet } from '@/chains/wireFluidTestnet';
 
 interface NavbarProps {
   state: AppState;
@@ -24,8 +26,12 @@ const PLAYER_VIEWS: Array<{ label: string; view: ViewType }> = [
 export function Navbar({ state, roles, onViewChange }: NavbarProps) {
   const [authError, setAuthError] = useState<string | null>(null);
   const auth = useSiweSession();
+  const { isConnected } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
+  const { data: walletClient } = useWalletClient();
 
   const hasAdminAccess = roles.admin || roles.operator || roles.scorePublisher || roles.treasury;
+  const showAdminEntry = isConnected && (hasAdminAccess || !roles.ready);
 
   const openAdmin = async () => {
     setAuthError(null);
@@ -37,6 +43,38 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Admin verification failed');
     }
+  };
+
+  const switchToConfiguredChain = async () => {
+    try {
+      await switchChainAsync({ chainId: configuredChainId });
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const needsAddChain =
+        message.includes("4902") ||
+        message.toLowerCase().includes("unknown chain") ||
+        message.toLowerCase().includes("unrecognized chain") ||
+        message.toLowerCase().includes("not added");
+      if (!needsAddChain || !walletClient) {
+        throw error;
+      }
+    }
+
+    await walletClient.request({
+      method: "wallet_addEthereumChain",
+      params: [{
+        chainId: `0x${configuredChainId.toString(16)}`,
+        chainName: wireFluidTestnet.name,
+        nativeCurrency: wireFluidTestnet.nativeCurrency,
+        rpcUrls: wireFluidTestnet.rpcUrls.default.http,
+        blockExplorerUrls: wireFluidTestnet.blockExplorers?.default?.url
+          ? [wireFluidTestnet.blockExplorers.default.url]
+          : undefined
+      }]
+    });
+
+    await switchChainAsync({ chainId: configuredChainId });
   };
 
   return (
@@ -70,7 +108,7 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
                 {item.label}
               </button>
             ))}
-            {hasAdminAccess ? (
+            {showAdminEntry ? (
               <button
                 onClick={openAdmin}
                 className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
@@ -105,10 +143,23 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
 
                 return (
                   <button
-                    onClick={chain.unsupported ? openChainModal : openAccountModal}
+                    onClick={async () => {
+                      if (!chain.unsupported) {
+                        openAccountModal();
+                        return;
+                      }
+                      setAuthError(null);
+                      try {
+                        await switchToConfiguredChain();
+                      } catch (error) {
+                        const fallbackMessage = `Unable to switch to chain ${configuredChainId}. Open wallet network settings and retry.`;
+                        setAuthError(error instanceof Error ? error.message : fallbackMessage);
+                        openChainModal();
+                      }
+                    }}
                     className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
                   >
-                    {chain.unsupported ? 'Wrong network' : shortAddress(account.address)}
+                    {chain.unsupported ? `Switch to ${configuredChainId}` : shortAddress(account.address)}
                   </button>
                 );
               }}
@@ -117,7 +168,7 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3 md:hidden">
-          {hasAdminAccess ? (
+          {showAdminEntry ? (
             <button
               onClick={openAdmin}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900"
