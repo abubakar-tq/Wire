@@ -1,5 +1,8 @@
 # Player Profiles, Admin UX, and Indexer Sync Plan
 
+> [!NOTE]
+> **Status (Postgres/Drizzle):** ✅ Implemented. The app uses Neon Postgres with Drizzle ORM.
+
 ## Goals
 - Keep on-chain player IDs and minimal data in contracts.
 - Store rich player profiles (name, photo, bio, tags, etc.) in Postgres.

@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "XDG_CONFIG_HOME=.ponder-config ponder dev",
-    "start": "XDG_CONFIG_HOME=.ponder-config ponder start",
-    "serve": "XDG_CONFIG_HOME=.ponder-config ponder serve",
-    "build": "XDG_CONFIG_HOME=.ponder-config ponder codegen",
-    "lint": "XDG_CONFIG_HOME=.ponder-config ponder codegen && tsc -p tsconfig.json",
-    "typecheck": "XDG_CONFIG_HOME=.ponder-config ponder codegen && tsc -p tsconfig.json"
+    "dev": "ponder dev",
+    "start": "ponder start",
+    "serve": "ponder serve",
+    "build": "ponder codegen",
+    "lint": "ponder codegen && tsc -p tsconfig.json",
+    "typecheck": "ponder codegen && tsc -p tsconfig.json"
   },
   "dependencies": {
     "@wirefluid/contracts": "workspace:*",
