@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Script, console2} from "forge-std/Script.sol";
+import {console2} from "forge-std/Script.sol";
 import {ContestManager} from "../src/ContestManager.sol";
 import {FantasyTeamNFT} from "../src/FantasyTeamNFT.sol";
 import {LegacyPassport} from "../src/LegacyPassport.sol";
 import {MatchRegistry} from "../src/MatchRegistry.sol";
 import {ScoreManager} from "../src/ScoreManager.sol";
+import {DeploymentReader} from "./DeploymentReader.s.sol";
 
-contract GrantRolesScript is Script {
+contract GrantRolesScript is DeploymentReader {
     function run() external {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(privateKey);
 
-        MatchRegistry registry = MatchRegistry(vm.envAddress("MATCH_REGISTRY"));
-        FantasyTeamNFT teamNft = FantasyTeamNFT(vm.envAddress("FANTASY_TEAM_NFT"));
-        ScoreManager scores = ScoreManager(vm.envAddress("SCORE_MANAGER"));
-        LegacyPassport passport = LegacyPassport(vm.envAddress("LEGACY_PASSPORT"));
-        ContestManager contests = ContestManager(vm.envAddress("CONTEST_MANAGER"));
+        MatchRegistry registry = MatchRegistry(_envOrDeploymentAddress("MATCH_REGISTRY", "matchRegistry"));
+        FantasyTeamNFT teamNft = FantasyTeamNFT(_envOrDeploymentAddress("FANTASY_TEAM_NFT", "fantasyTeamNft"));
+        ScoreManager scores = ScoreManager(_envOrDeploymentAddress("SCORE_MANAGER", "scoreManager"));
+        LegacyPassport passport = LegacyPassport(_envOrDeploymentAddress("LEGACY_PASSPORT", "legacyPassport"));
+        ContestManager contests = ContestManager(_envOrDeploymentAddress("CONTEST_MANAGER", "contestManager"));
 
         address operator = vm.envOr("OPERATOR_ADDRESS", deployer);
         address publisher = vm.envOr("SCORE_PUBLISHER", deployer);

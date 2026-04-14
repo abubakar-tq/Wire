@@ -2,23 +2,23 @@ import {
   contestManagerAbi,
   fantasyTeamNftAbi,
   getContractAddresses,
+  getWireFluidChain,
   legacyPassportAbi,
   matchRegistryAbi,
-  scoreManagerAbi,
-  WIREFLUID_TESTNET_CHAIN_ID,
-  WIREFLUID_TESTNET_RPC_URL
+  scoreManagerAbi
 } from "@wirefluid/contracts";
 import { createConfig } from "ponder";
 
 const isCodegen = process.argv.some((arg) => arg.includes("codegen"));
+const chain = getWireFluidChain(process.env);
 const addresses = getContractAddresses(process.env, { strict: !isCodegen });
 const startBlock = Number(process.env.PONDER_START_BLOCK ?? "0");
-const rpc = process.env.WIREFLUID_RPC_URL ?? WIREFLUID_TESTNET_RPC_URL;
+const rpc = chain.rpcUrls.default.http[0];
 
 export default createConfig({
   chains: {
-    wireFluidTestnet: {
-      id: WIREFLUID_TESTNET_CHAIN_ID,
+    wireFluid: {
+      id: chain.id,
       rpc,
       pollingInterval: 2_000
     }
@@ -26,31 +26,31 @@ export default createConfig({
   contracts: {
     MatchRegistry: {
       abi: matchRegistryAbi,
-      chain: "wireFluidTestnet",
+      chain: "wireFluid",
       address: addresses.matchRegistry,
       startBlock
     },
     FantasyTeamNFT: {
       abi: fantasyTeamNftAbi,
-      chain: "wireFluidTestnet",
+      chain: "wireFluid",
       address: addresses.fantasyTeamNft,
       startBlock
     },
     LegacyPassport: {
       abi: legacyPassportAbi,
-      chain: "wireFluidTestnet",
+      chain: "wireFluid",
       address: addresses.legacyPassport,
       startBlock
     },
     ScoreManager: {
       abi: scoreManagerAbi,
-      chain: "wireFluidTestnet",
+      chain: "wireFluid",
       address: addresses.scoreManager,
       startBlock
     },
     ContestManager: {
       abi: contestManagerAbi,
-      chain: "wireFluidTestnet",
+      chain: "wireFluid",
       address: addresses.contestManager,
       startBlock
     }

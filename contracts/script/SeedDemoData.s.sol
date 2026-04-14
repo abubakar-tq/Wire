@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Script, console2} from "forge-std/Script.sol";
+import {console2} from "forge-std/Script.sol";
 import {ContestManager} from "../src/ContestManager.sol";
 import {MatchRegistry} from "../src/MatchRegistry.sol";
 import {AWAY_TEAM_SIDE, HOME_TEAM_SIDE, RoleType} from "../src/types/Structs.sol";
+import {DeploymentReader} from "./DeploymentReader.s.sol";
 
-contract SeedDemoDataScript is Script {
+contract SeedDemoDataScript is DeploymentReader {
     bytes32 private constant HOME_TEAM = 0x574952455f484f4d450000000000000000000000000000000000000000000000;
     bytes32 private constant AWAY_TEAM = 0x574952455f415741590000000000000000000000000000000000000000000000;
 
     function run() external {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
-        MatchRegistry registry = MatchRegistry(vm.envAddress("MATCH_REGISTRY"));
-        ContestManager contests = ContestManager(vm.envAddress("CONTEST_MANAGER"));
+        MatchRegistry registry = MatchRegistry(_envOrDeploymentAddress("MATCH_REGISTRY", "matchRegistry"));
+        ContestManager contests = ContestManager(_envOrDeploymentAddress("CONTEST_MANAGER", "contestManager"));
 
         uint256 matchId = vm.envOr("DEMO_MATCH_ID", uint256(2026041301));
         uint256 contestId = vm.envOr("DEMO_CONTEST_ID", uint256(202604130100));

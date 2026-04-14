@@ -1,4 +1,6 @@
 import { getAddress, isAddress, zeroAddress, type Address } from "viem";
+import { readWireFluidChainId } from "./chain";
+import { getDeploymentAddresses } from "./deployments";
 
 export type ContractAddresses = {
   matchRegistry: Address;
@@ -24,12 +26,32 @@ const addressKeys = {
 } as const;
 
 export function getContractAddresses(env: AddressEnv, options: AddressOptions = {}): ContractAddresses {
+  const deploymentAddresses = getDeploymentAddresses(readWireFluidChainId(env, options));
+
   return {
-    matchRegistry: readAddress(env, addressKeys.matchRegistry, "MATCH_REGISTRY", options),
-    fantasyTeamNft: readAddress(env, addressKeys.fantasyTeamNft, "FANTASY_TEAM_NFT", options),
-    legacyPassport: readAddress(env, addressKeys.legacyPassport, "LEGACY_PASSPORT", options),
-    scoreManager: readAddress(env, addressKeys.scoreManager, "SCORE_MANAGER", options),
-    contestManager: readAddress(env, addressKeys.contestManager, "CONTEST_MANAGER", options)
+    matchRegistry: readAddress(env, addressKeys.matchRegistry, "MATCH_REGISTRY", deploymentAddresses.matchRegistry, options),
+    fantasyTeamNft: readAddress(
+      env,
+      addressKeys.fantasyTeamNft,
+      "FANTASY_TEAM_NFT",
+      deploymentAddresses.fantasyTeamNft,
+      options
+    ),
+    legacyPassport: readAddress(
+      env,
+      addressKeys.legacyPassport,
+      "LEGACY_PASSPORT",
+      deploymentAddresses.legacyPassport,
+      options
+    ),
+    scoreManager: readAddress(env, addressKeys.scoreManager, "SCORE_MANAGER", deploymentAddresses.scoreManager, options),
+    contestManager: readAddress(
+      env,
+      addressKeys.contestManager,
+      "CONTEST_MANAGER",
+      deploymentAddresses.contestManager,
+      options
+    )
   };
 }
 
@@ -41,6 +63,7 @@ function readAddress(
   env: AddressEnv,
   keys: readonly [string, string],
   label: string,
+  deploymentAddress: Address,
   options: AddressOptions
 ): Address {
   const key = options.publicPrefix ? keys[1] : keys[0];
@@ -48,6 +71,9 @@ function readAddress(
   const raw = env[key] ?? env[fallbackKey];
 
   if (!raw || raw === zeroAddress) {
+    if (deploymentAddress !== zeroAddress) {
+      return deploymentAddress;
+    }
     if (options.strict) {
       throw new Error(`${label} is required`);
     }
