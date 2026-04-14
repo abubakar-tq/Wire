@@ -87,6 +87,30 @@ Open:
 http://localhost:3000
 ```
 
+## Switching To Admin
+
+Use the default Anvil deployer wallet locally:
+
+```text
+Address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+Chain ID: 31337
+RPC: http://127.0.0.1:8545
+Currency: WIRE
+```
+
+The deploy script grants the required local admin/operator/publisher roles to this wallet. After the web app loads:
+
+1. Connect the wallet.
+2. Switch the wallet network to chain `31337`.
+3. Wait for role checks to finish.
+4. Click `Admin` in the navbar.
+5. Sign the admin verification message.
+6. Use `Match` to create matches, set player pools, and create contests.
+7. Use `Score` to submit stats.
+8. Use `Treasury` to finalize/cancel contests and manage payouts.
+
+If the Admin button does not appear, check that the wallet is the deployer wallet, Anvil is running, the contracts were deployed on chain `31337`, and the web app was restarted after env changes.
+
 ## Required Local Environment
 
 `apps/indexer/.env.local`:
