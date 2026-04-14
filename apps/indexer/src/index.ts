@@ -1,11 +1,15 @@
 import {
   auditEvents,
+  claims,
+  contractMetadata,
   contestEntries,
   contests,
   contestWinners,
   matches,
   matchPlayers,
+  nftTransfers,
   passports,
+  scoreSubmissions,
   playerStats,
   refunds,
   squads,
@@ -162,6 +166,41 @@ ponder.on("FantasyTeamNFT:SquadUpdated", async ({ event, context }) => {
 
 ponder.on("FantasyTeamNFT:BaseURIUpdated", async ({ event, context }) => {
   await recordAudit(context, event, "FantasyTeamNFT", "BaseURIUpdated");
+  await recordContractMetadata(context, event, "FantasyTeamNFT", event.args.baseURI, event.args.updater);
+});
+
+ponder.on("FantasyTeamNFT:Transfer", async ({ event, context }) => {
+  await recordAudit(context, event, "FantasyTeamNFT", "Transfer");
+  await context.db
+    .insert(nftTransfers)
+    .values({
+      id: event.id,
+      tokenId: event.args.tokenId,
+      from: event.args.from,
+      to: event.args.to,
+      blockNumber: event.block.number,
+      blockTimestamp: event.block.timestamp,
+      transactionHash: event.transaction.hash
+    })
+    .onConflictDoNothing();
+  await context.db
+    .insert(squads)
+    .values({
+      id: id(event.args.tokenId),
+      tokenId: event.args.tokenId,
+      owner: event.args.to,
+      matchId: 0n,
+      playerIds: [],
+      captainId: 0,
+      viceCaptainId: 0,
+      updatedBy: event.args.to,
+      mintedAtBlock: event.block.number,
+      updatedAtBlock: event.block.number
+    })
+    .onConflictDoUpdate({
+      owner: event.args.to,
+      updatedAtBlock: event.block.number
+    });
 });
 
 ponder.on("LegacyPassport:LegacyPassportMinted", async ({ event, context }) => {
@@ -214,6 +253,7 @@ ponder.on("LegacyPassport:LegacyRewardRecorded", async ({ event, context }) => {
 
 ponder.on("LegacyPassport:LegacyPassportBaseURIUpdated", async ({ event, context }) => {
   await recordAudit(context, event, "LegacyPassport", "LegacyPassportBaseURIUpdated");
+  await recordContractMetadata(context, event, "LegacyPassport", event.args.baseURI, event.args.updater);
 });
 
 ponder.on("ScoreManager:PlayerStatsRecorded", async ({ event, context }) => {
@@ -263,6 +303,24 @@ ponder.on("ScoreManager:PlayerPointsComputed", async ({ event, context }) => {
 
 ponder.on("ScoreManager:MatchStatsSubmitted", async ({ event, context }) => {
   await recordAudit(context, event, "ScoreManager", "MatchStatsSubmitted");
+  await context.db
+    .insert(scoreSubmissions)
+    .values({
+      id: id(event.args.matchId),
+      matchId: event.args.matchId,
+      playerCount: Number(event.args.playerCount),
+      publisher: event.args.publisher,
+      submittedAtBlock: event.block.number,
+      submittedAtTimestamp: event.block.timestamp,
+      transactionHash: event.transaction.hash
+    })
+    .onConflictDoUpdate({
+      playerCount: Number(event.args.playerCount),
+      publisher: event.args.publisher,
+      submittedAtBlock: event.block.number,
+      submittedAtTimestamp: event.block.timestamp,
+      transactionHash: event.transaction.hash
+    });
 });
 
 ponder.on("ContestManager:ContestCreated", async ({ event, context }) => {
@@ -490,6 +548,10 @@ ponder.on("ContestManager:ContestCancelled", async ({ event, context }) => {
 
 ponder.on("ContestManager:RewardClaimed", async ({ event, context }) => {
   await recordAudit(context, event, "ContestManager", "RewardClaimed");
+  await recordClaim(context, event, "reward", {
+    user: event.args.user,
+    amount: event.args.amount
+  });
   await creditUserBalance(context, event.args.user, {
     rewardClaimedDelta: event.args.amount,
     blockNumber: event.block.number
@@ -498,6 +560,10 @@ ponder.on("ContestManager:RewardClaimed", async ({ event, context }) => {
 
 ponder.on("ContestManager:RefundClaimed", async ({ event, context }) => {
   await recordAudit(context, event, "ContestManager", "RefundClaimed");
+  await recordClaim(context, event, "refund", {
+    user: event.args.user,
+    amount: event.args.amount
+  });
   await creditUserBalance(context, event.args.user, {
     refundClaimedDelta: event.args.amount,
     blockNumber: event.block.number
@@ -521,6 +587,11 @@ ponder.on("ContestManager:TreasuryUpdated", async ({ event, context }) => {
 
 ponder.on("ContestManager:TreasuryClaimed", async ({ event, context }) => {
   await recordAudit(context, event, "ContestManager", "TreasuryClaimed");
+  await recordClaim(context, event, "treasury", {
+    treasury: event.args.treasury,
+    claimer: event.args.claimer,
+    amount: event.args.amount
+  });
   await context.db
     .insert(treasuryState)
     .values({
@@ -555,6 +626,58 @@ async function recordAudit(context: ArenaContext, event: ArenaEvent, contractNam
       transactionHash: event.transaction.hash,
       contractAddress: event.log.address,
       args: serializeArgs(event.args)
+    })
+    .onConflictDoNothing();
+}
+
+async function recordContractMetadata(
+  context: ArenaContext,
+  event: ArenaEvent,
+  contractName: string,
+  baseURI: string,
+  updater: Address
+) {
+  await context.db
+    .insert(contractMetadata)
+    .values({
+      id: contractName,
+      contractName,
+      baseURI,
+      updater,
+      updatedAtBlock: event.block.number,
+      transactionHash: event.transaction.hash
+    })
+    .onConflictDoUpdate({
+      baseURI,
+      updater,
+      updatedAtBlock: event.block.number,
+      transactionHash: event.transaction.hash
+    });
+}
+
+async function recordClaim(
+  context: ArenaContext,
+  event: ArenaEvent,
+  claimType: "reward" | "refund" | "treasury",
+  values: {
+    user?: Address;
+    treasury?: Address;
+    claimer?: Address;
+    amount: bigint;
+  }
+) {
+  await context.db
+    .insert(claims)
+    .values({
+      id: event.id,
+      claimType,
+      user: values.user ?? null,
+      treasury: values.treasury ?? null,
+      claimer: values.claimer ?? null,
+      amount: values.amount,
+      blockNumber: event.block.number,
+      blockTimestamp: event.block.timestamp,
+      transactionHash: event.transaction.hash
     })
     .onConflictDoNothing();
 }

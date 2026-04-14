@@ -127,6 +127,23 @@ export const playerStats = onchainTable(
   })
 );
 
+export const scoreSubmissions = onchainTable(
+  "score_submissions",
+  (t) => ({
+    id: t.text().primaryKey(),
+    matchId: t.bigint().notNull(),
+    playerCount: t.integer().notNull(),
+    publisher: t.hex().notNull(),
+    submittedAtBlock: t.bigint().notNull(),
+    submittedAtTimestamp: t.bigint().notNull(),
+    transactionHash: t.hex().notNull()
+  }),
+  (table) => ({
+    matchIdx: index().on(table.matchId),
+    publisherIdx: index().on(table.publisher)
+  })
+);
+
 export const contests = onchainTable(
   "contests",
   (t) => ({
@@ -190,6 +207,59 @@ export const contestWinners = onchainTable(
   (table) => ({
     contestIdx: index().on(table.contestId),
     userIdx: index().on(table.user)
+  })
+);
+
+export const claims = onchainTable(
+  "claims",
+  (t) => ({
+    id: t.text().primaryKey(),
+    claimType: t.text().notNull(),
+    user: t.hex(),
+    treasury: t.hex(),
+    claimer: t.hex(),
+    amount: t.bigint().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    transactionHash: t.hex().notNull()
+  }),
+  (table) => ({
+    typeIdx: index().on(table.claimType),
+    userIdx: index().on(table.user),
+    treasuryIdx: index().on(table.treasury)
+  })
+);
+
+export const contractMetadata = onchainTable(
+  "contract_metadata",
+  (t) => ({
+    id: t.text().primaryKey(),
+    contractName: t.text().notNull(),
+    baseURI: t.text().notNull(),
+    updater: t.hex().notNull(),
+    updatedAtBlock: t.bigint().notNull(),
+    transactionHash: t.hex().notNull()
+  }),
+  (table) => ({
+    contractIdx: index().on(table.contractName)
+  })
+);
+
+export const nftTransfers = onchainTable(
+  "nft_transfers",
+  (t) => ({
+    id: t.text().primaryKey(),
+    tokenId: t.bigint().notNull(),
+    from: t.hex().notNull(),
+    to: t.hex().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    transactionHash: t.hex().notNull()
+  }),
+  (table) => ({
+    tokenIdx: index().on(table.tokenId),
+    fromIdx: index().on(table.from),
+    toIdx: index().on(table.to)
   })
 );
 
