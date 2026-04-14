@@ -54,6 +54,9 @@ build/
 out/
 .turbo/
 .vite/
+.ponder/
+**/.ponder/
+**/.ponder-config/
 coverage/
 .vercel/
 .netlify/
