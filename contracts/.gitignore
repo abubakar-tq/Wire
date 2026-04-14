@@ -1,0 +1,29 @@
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Dependencies installed locally
+/lib/
+/node_modules/
+
+# Foundry build and test artifacts
+cache/
+out/
+coverage/
+lcov.info
+gas-snapshot
+
+# Broadcast logs and dry runs
+broadcast/
+
+# Logs
+*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

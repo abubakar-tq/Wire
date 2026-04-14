@@ -1,0 +1,80 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.secret
+*.mnemonic
+keystore/
+wallets/
+
+# Local agent/workspace files
+.codex
+.codex/
+
+# Local planning and generated design material
+Idea.md
+contracts/docs/ADMIN_DESIGN.md
+contracts/.github/
+stitch/
+.stitch/
+designs/
+design-exports/
+screens/
+wireframes/
+*.fig
+*.sketch
+
+# Foundry artifacts
+**/out/
+**/cache/
+**/broadcast/
+**/coverage/
+**/lcov.info
+**/gas-snapshot
+
+# Foundry dependencies installed locally
+contracts/lib/
+contracts/.gitmodules
+
+# Nested git metadata from scaffolded subprojects
+contracts/.git/
+
+# Node/frontend artifacts
+node_modules/
+**/node_modules/
+dist/
+build/
+.next/
+.nuxt/
+out/
+.turbo/
+.vite/
+coverage/
+.vercel/
+.netlify/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
+*.tmp
