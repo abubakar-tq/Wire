@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle, Loader, Save } from 'lucide-react';
 import { scoreManagerAbi } from '@wirefluid/contracts';
 import { contractAddresses } from '@/contracts/addresses';
-import { useIndexedMatch, useIndexedMatches } from '@/api/useIndexerData';
+import { useIndexedMatches, useMatchData } from '@/api/useIndexerData';
 import { useArenaWriter } from '@/web3/useArenaWriter';
-import { roleLabel, teamSideLabel } from '@/utils/arenaFormat';
+import { formatDateTime, roleLabel, safePlayerName, statusLabel, teamSideLabel } from '@/utils/arenaFormat';
 
 interface AdminScoreViewProps {
   onUpdateScore: (playerId: string, points: number) => void;
@@ -48,7 +48,8 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
   const matches = useIndexedMatches();
   const defaultMatchId = matches.data?.[0]?.matchId ?? '';
   const [matchId, setMatchId] = useState(defaultMatchId);
-  const match = useIndexedMatch(matchId);
+  const matchOptions = matches.data ?? [];
+  const match = useMatchData(matchId);
   const writer = useArenaWriter();
   const [rows, setRows] = useState<StatRow[]>([]);
 
@@ -106,14 +107,33 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
         <p className="text-slate-600">Submit raw cricket stats once per match</p>
       </div>
 
+      {writer.rpcChainId && writer.configuredChainId && writer.rpcChainId !== writer.configuredChainId && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          RPC chain ID {writer.rpcChainId} does not match the configured chain ID {writer.configuredChainId}. Update your env or restart Anvil with the correct chain ID.
+        </div>
+      )}
+
       <div className="mb-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 rounded-lg border border-slate-200 p-4">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">Match ID</label>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">Match</label>
+          <select
+            value={matchOptions.some((option) => option.matchId === matchId) ? matchId : ''}
+            onChange={(event) => setMatchId(event.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          >
+            <option value="">Custom match ID</option>
+            {matchOptions.map((option) => (
+              <option key={option.matchId} value={option.matchId}>
+                #{option.matchId} · {statusLabel(option.status)} · lock {formatDateTime(option.lockTime)}
+              </option>
+            ))}
+          </select>
+          <label className="mt-3 block text-xs font-semibold text-slate-600">Manual match ID</label>
           <input
             value={matchId}
             onChange={(event) => setMatchId(event.target.value)}
             placeholder="Match ID"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="rounded-lg border border-slate-200 p-4">
@@ -141,10 +161,14 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
           <tbody className="divide-y divide-slate-200">
             {rows.map((row) => {
               const meta = match.data?.players.find((player) => player.playerId === row.playerId);
+              const displayName = safePlayerName(row.playerId);
               return (
                 <tr key={row.playerId}>
                   <td className="px-3 py-3 font-semibold text-slate-900">
-                    Player {row.playerId}
+                    <div className="flex items-center gap-2">
+                      <span>{displayName}</span>
+                      <span className="text-xs text-slate-500">#{row.playerId}</span>
+                    </div>
                     {meta && <p className="text-xs text-slate-500">{roleLabel(meta.role)} · {teamSideLabel(meta.teamSide)}</p>}
                   </td>
                   {(['runs', 'fours', 'sixes', 'wickets', 'maidens', 'catches', 'stumpings', 'runOutDirect', 'runOutIndirect'] as const).map((field) => (
@@ -183,13 +207,28 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
       </div>
 
       <button
-        onClick={submitStats}
+        onClick={() => {
+          void submitStats().catch(() => {});
+        }}
         disabled={writer.isSubmitting || rows.length === 0 || !matchId}
         className="mt-8 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg disabled:opacity-50"
       >
         {writer.isSubmitting ? <Loader className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
         Submit Stats
       </button>
+
+      {writer.isConfirming && writer.hash && (
+        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <p className="font-semibold">Transaction is confirming</p>
+          <p className="mt-1 break-all">{writer.hash}</p>
+          <button
+            onClick={writer.reset}
+            className="mt-3 rounded border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100"
+          >
+            Clear Pending State
+          </button>
+        </div>
+      )}
 
       {writer.isConfirmed && (
         <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-2 text-sm text-emerald-800">

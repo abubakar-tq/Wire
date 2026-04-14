@@ -1,4 +1,5 @@
-const indexerUrl = process.env.NEXT_PUBLIC_INDEXER_URL ?? "http://localhost:42069";
+export const INDEXER_URL = process.env.NEXT_PUBLIC_INDEXER_URL ?? "http://localhost:42069";
+const indexerUrl = INDEXER_URL;
 
 export type HexString = `0x${string}`;
 

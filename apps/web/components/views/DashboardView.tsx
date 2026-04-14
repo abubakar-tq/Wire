@@ -3,6 +3,7 @@
 import { Award, Gift, Trophy, Users, Wallet, Zap } from "lucide-react";
 import type { AppState } from "@/types/index";
 import { useCurrentUserPassport, useIndexedContests, useIndexedMatches } from "@/api/useIndexerData";
+import { INDEXER_URL } from "@/api/indexerClient";
 import { formatDateTime, formatWire, statusLabel, teamCodeFromBytes } from "@/utils/arenaFormat";
 import { getPassportLevel } from "@/utils/passportLevel";
 
@@ -19,6 +20,7 @@ export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
   const passportStats = passport.data?.passport ?? null;
   const balance = passport.data?.balance ?? null;
   const level = getPassportLevel(passportStats);
+  const indexerUnavailable = matches.isError || contests.isError;
 
   return (
     <div className="flex-1 overflow-y-auto h-[calc(100vh-73px)] bg-white">
@@ -33,6 +35,12 @@ export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
             Current draft: <span className="font-semibold text-slate-900">{state.squad.players.length}/11 players</span>
           </div>
         </header>
+
+        {indexerUnavailable ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Indexer is unreachable at {INDEXER_URL}. Start the Ponder indexer to load matches and contests.
+          </div>
+        ) : null}
 
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-5">
           <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">

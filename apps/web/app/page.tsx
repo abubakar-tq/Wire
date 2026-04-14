@@ -20,6 +20,7 @@ import { contractAddresses, contractsConfigured } from '@/contracts/addresses';
 import { configuredChainId } from '@/chains/wireFluidTestnet';
 import { toUint16Array11 } from '@/utils/arenaFormat';
 import { useRoleChecks } from '@/web3/useRoleChecks';
+import { useSiweSession } from '@/auth/useSiweSession';
 import type { HexString } from '@/api/indexerClient';
 import type { CricketPlayer, Squad } from '@/types/index';
 
@@ -37,6 +38,7 @@ export default function Page() {
   const [selectedContestId, setSelectedContestId] = useState<string | undefined>();
   const live = useLiveArenaData(selectedContestId);
   const roles = useRoleChecks();
+  const auth = useSiweSession();
   const { address } = useAccount();
   const chainId = useChainId();
   const queryClient = useQueryClient();
@@ -120,7 +122,7 @@ export default function Page() {
     activeSquad.viceCaptainId !== null &&
     activeSquad.captainId !== activeSquad.viceCaptainId;
 
-  const isAdmin = roles.admin || roles.operator || roles.scorePublisher || roles.treasury;
+  const isAdmin = roles.admin || roles.operator || roles.scorePublisher || roles.treasury || auth.authenticated;
   const effectiveState = {
     ...state,
     userRole: isAdmin ? 'ADMIN' as const : 'PLAYER' as const,
@@ -216,7 +218,7 @@ export default function Page() {
       case 'REWARDS':
         return <RewardsView wireBalance={state.wireBalance} onClaimRewards={actions.updateWireBalance} />;
       case 'ADMIN_DASHBOARD':
-        return <AdminDashboardView />;
+        return <AdminDashboardView onViewChange={actions.setActiveView} />;
       case 'PROTOCOL':
         return <ProtocolView />;
       case 'MATCH':

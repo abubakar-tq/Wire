@@ -2,12 +2,18 @@
 
 import { Activity, AlertCircle, BadgeCheck, Database, Settings2, Trophy, Wallet } from 'lucide-react';
 import { useIndexerSummary, useAuditEvents } from '@/api/useIndexerData';
+import { INDEXER_URL } from '@/api/indexerClient';
 import { useRoleChecks } from '@/web3/useRoleChecks';
 import { formatDateTime, formatWire, statusLabel, teamCodeFromBytes } from '@/utils/arenaFormat';
 import { useSiweSession } from '@/auth/useSiweSession';
 import { useCurrentUserPassport } from '@/api/useIndexerData';
+import type { ViewType } from '@/types/index';
 
-export function AdminDashboardView() {
+interface AdminDashboardViewProps {
+  onViewChange: (view: ViewType) => void;
+}
+
+export function AdminDashboardView({ onViewChange }: AdminDashboardViewProps) {
   const summary = useIndexerSummary();
   const audit = useAuditEvents();
   const roles = useRoleChecks();
@@ -18,6 +24,7 @@ export function AdminDashboardView() {
   const treasury = summary.data?.treasury ?? null;
   const pendingFinalization = contests.filter((contest) => !contest.finalized && !contest.cancelled && contest.totalEntries >= 3);
   const waitingForStats = matches.filter((match) => match.status === 0 || match.status === 1);
+  const indexerUnavailable = summary.isError || audit.isError;
 
   const metrics = [
     { label: 'Recent matches', value: matches.length.toString(), icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -34,6 +41,12 @@ export function AdminDashboardView() {
           <p className="text-slate-600 text-lg">Protocol operations, indexed events, and pending actions</p>
         </div>
 
+        {indexerUnavailable ? (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Indexer is unreachable at {INDEXER_URL}. Start the Ponder indexer to refresh admin metrics.
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
             <div className="flex items-center gap-2 mb-3">
@@ -44,7 +57,16 @@ export function AdminDashboardView() {
               <InfoRow label="Admin verification" value={auth.authenticated ? 'Verified' : 'Not verified'} />
               <InfoRow label="Wallet" value={auth.session?.address ?? 'Connect wallet first'} />
               <InfoRow label="LegacyPassport" value={passport.data?.passport ? `#${passport.data.passport.tokenId}` : 'No passport yet'} />
-              <InfoRow label="Admin roles" value={roles.admin || roles.operator || roles.scorePublisher || roles.treasury ? 'Granted' : 'Missing'} />
+              <InfoRow
+                label="Admin roles"
+                value={
+                  !roles.ready
+                    ? 'Checking'
+                    : roles.admin || roles.operator || roles.scorePublisher || roles.treasury
+                      ? 'Granted'
+                      : 'Missing'
+                }
+              />
             </div>
           </div>
 
@@ -64,6 +86,37 @@ export function AdminDashboardView() {
               {auth.authenticated ? 'Sign out' : 'Verify admin'}
             </button>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-8">
+          <button
+            onClick={() => onViewChange('MATCH')}
+            className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
+          >
+            <p className="text-sm font-semibold text-slate-900">Manage Matches</p>
+            <p className="text-xs text-slate-600 mt-1">Create match, set player pool, create contest</p>
+          </button>
+          <button
+            onClick={() => onViewChange('SCORE')}
+            className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
+          >
+            <p className="text-sm font-semibold text-slate-900">Publish Scores</p>
+            <p className="text-xs text-slate-600 mt-1">Submit match results and fantasy points inputs</p>
+          </button>
+          <button
+            onClick={() => onViewChange('TREASURY')}
+            className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
+          >
+            <p className="text-sm font-semibold text-slate-900">Treasury & Payouts</p>
+            <p className="text-xs text-slate-600 mt-1">Finalize, cancel, claim treasury/rewards/refunds</p>
+          </button>
+          <button
+            onClick={() => onViewChange('PROTOCOL')}
+            className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
+          >
+            <p className="text-sm font-semibold text-slate-900">Contracts & Roles</p>
+            <p className="text-xs text-slate-600 mt-1">Role checks, base URI, deployment diagnostics</p>
+          </button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -135,8 +188,8 @@ export function AdminDashboardView() {
               ] as const).map(([label, enabled]) => (
                 <div key={label} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
                   <span className="text-sm text-slate-700">{label}</span>
-                  <span className={`rounded px-2 py-1 text-xs font-semibold ${enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                    {enabled ? 'Granted' : 'Missing'}
+                  <span className={`rounded px-2 py-1 text-xs font-semibold ${!roles.ready ? 'bg-blue-50 text-blue-700' : enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {!roles.ready ? 'Checking' : enabled ? 'Granted' : 'Missing'}
                   </span>
                 </div>
               ))}
