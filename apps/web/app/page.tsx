@@ -34,13 +34,15 @@ export default function Page() {
   const [txHash, setTxHash] = useState<HexString | undefined>();
   const [joinError, setJoinError] = useState<string | undefined>();
   const [squadsByMatch, setSquadsByMatch] = useState<Record<string, Squad>>({});
-  const live = useLiveArenaData();
+  const [selectedContestId, setSelectedContestId] = useState<string | undefined>();
+  const live = useLiveArenaData(selectedContestId);
   const roles = useRoleChecks();
   const { address } = useAccount();
   const chainId = useChainId();
   const queryClient = useQueryClient();
   const { writeContractAsync, status: writeStatus, error: writeError } = useWriteContract();
   const receipt = useWaitForTransactionReceipt({ hash: txHash });
+  const wrongChain = Boolean(address && chainId !== configuredChainId);
 
   useEffect(() => {
     if (!receipt.isSuccess) return;
@@ -172,10 +174,15 @@ export default function Page() {
     }
   };
 
+  const buildSquadForContest = useCallback((contestId: string) => {
+    setSelectedContestId(contestId);
+    actions.setActiveView('ARENA');
+  }, [actions]);
+
   const renderView = () => {
     switch (effectiveState.activeView) {
       case 'DASHBOARD':
-        return <DashboardView state={effectiveState} />;
+        return <DashboardView state={effectiveState} onBuildSquad={buildSquadForContest} />;
       case 'ARENA':
         return (
           <ArenaView
@@ -226,7 +233,12 @@ export default function Page() {
   return (
     <div className="bg-white">
       <Navbar state={effectiveState} roles={roles} onViewChange={actions.setActiveView} />
-      <div className="flex h-[calc(100vh-73px)] flex-col md:flex-row">
+      {wrongChain ? (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm font-medium text-amber-900">
+          Switch your wallet to chain {configuredChainId} before submitting transactions.
+        </div>
+      ) : null}
+      <div className={`flex ${wrongChain ? 'h-[calc(100vh-113px)]' : 'h-[calc(100vh-73px)]'} flex-col md:flex-row`}>
         {/* Sidebar - Hidden on mobile, shown on md+ */}
         <div className="hidden md:block md:w-64 lg:w-64 bg-white border-r border-slate-200 overflow-y-auto">
           <Sidebar state={effectiveState} onViewChange={actions.setActiveView} hasAdminAccess={isAdmin} />

@@ -7,7 +7,7 @@ import { contractAddresses } from '@/contracts/addresses';
 import { useCurrentUserPassport } from '@/api/useIndexerData';
 import { useArenaWriter } from '@/web3/useArenaWriter';
 import { formatWire } from '@/utils/arenaFormat';
-import { useSiweSession } from '@/auth/useSiweSession';
+import { getPassportLevel } from '@/utils/passportLevel';
 
 interface RewardsViewProps {
   wireBalance: number;
@@ -17,7 +17,6 @@ interface RewardsViewProps {
 export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const passport = useCurrentUserPassport();
-  const auth = useSiweSession();
   const writer = useArenaWriter();
 
   const claimableReward = passport.data?.balance?.claimableReward ?? '0';
@@ -43,9 +42,7 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
     setStatusMessage('Refund claim submitted.');
   };
 
-  const growthScore = profile
-    ? Math.min(100, Number(profile.contestsEntered) * 4 + Number(profile.contestsWon) * 8)
-    : 0;
+  const level = getPassportLevel(profile);
 
   return (
     <div className="flex-1 overflow-y-auto h-[calc(100vh-73px)] bg-white">
@@ -80,39 +77,27 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
             </div>
 
             <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard label="Level" value={level.name} />
+              <StatCard label="XP" value={level.xp.toString()} />
               <StatCard label="Contests Entered" value={profile ? profile.contestsEntered.toString() : '0'} />
               <StatCard label="Winning Entries" value={profile ? profile.contestsWon.toString() : '0'} />
-              <StatCard label="Rewards Claimed" value={profile ? formatWire(profile.totalRewardsClaimed) : '0 WIRE'} />
-              <StatCard label="Profile Growth" value={`${growthScore}%`} />
             </div>
 
             <div className="mt-4">
               <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                <span>Progression Across Matches</span>
-                <span>{growthScore}%</span>
+                <span>{level.nextMin ? `Next level at ${level.nextMin} XP` : 'Max level'}</span>
+                <span>{level.progress}%</span>
               </div>
               <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
-                <div className="h-full rounded-full bg-slate-900" style={{ width: `${growthScore}%` }} />
+                <div className="h-full rounded-full bg-slate-900" style={{ width: `${level.progress}%` }} />
               </div>
             </div>
           </div>
 
           <aside className="rounded-2xl border border-slate-200 bg-white p-5">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Authorization</h3>
-            <p className="mt-2 font-semibold text-slate-900">{auth.authenticated ? 'SIWE Session Active' : 'Wallet-Only Mode'}</p>
-            <p className="mt-1 text-xs text-slate-500 break-all">{auth.session?.address ?? 'Sign in to access admin APIs'}</p>
-            <button
-              onClick={async () => {
-                if (auth.authenticated) {
-                  await auth.signOut();
-                } else {
-                  await auth.signIn();
-                }
-              }}
-              className="mt-4 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-            >
-              {auth.authenticated ? 'Sign Out' : 'Sign In'}
-            </button>
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Rewards Claimed</h3>
+            <p className="mt-3 text-2xl font-bold text-slate-900">{profile ? formatWire(profile.totalRewardsClaimed) : '0 WIRE'}</p>
+            <p className="mt-2 text-sm text-slate-600">Your passport level grows from contest entries and wins.</p>
           </aside>
         </section>
 

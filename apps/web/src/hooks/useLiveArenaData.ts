@@ -6,9 +6,12 @@ import { useIndexedContest, useIndexedContests, useIndexedLeaderboard, useIndexe
 import type { CricketPlayer, LeaderboardEntry } from "@/types/index";
 import { roleLabel, safePlayerName, teamCodeFromBytes, teamSideLabel } from "@/utils/arenaFormat";
 
-export function useLiveArenaData() {
+export function useLiveArenaData(selectedContestId?: string) {
   const contestsQuery = useIndexedContests();
-  const selectedContest = useMemo(() => selectContest(contestsQuery.data ?? []), [contestsQuery.data]);
+  const selectedContest = useMemo(
+    () => selectContest(contestsQuery.data ?? [], selectedContestId),
+    [contestsQuery.data, selectedContestId]
+  );
   const matchQuery = useIndexedMatch(selectedContest?.matchId);
   const contestQuery = useIndexedContest(selectedContest?.contestId);
   const leaderboardQuery = useIndexedLeaderboard(selectedContest?.contestId);
@@ -64,6 +67,10 @@ export function useLiveArenaData() {
   };
 }
 
-function selectContest(contests: IndexedContest[]): IndexedContest | null {
+function selectContest(contests: IndexedContest[], selectedContestId?: string): IndexedContest | null {
+  if (selectedContestId) {
+    const selected = contests.find((contest) => contest.contestId === selectedContestId);
+    if (selected) return selected;
+  }
   return contests.find((contest) => !contest.finalized && !contest.cancelled) ?? contests[0] ?? null;
 }
