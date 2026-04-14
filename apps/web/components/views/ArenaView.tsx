@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { AlertCircle, ChevronDown, Lock, Plus, Sparkles, Trash2 } from 'lucide-react';
 import type { CricketPlayer, Squad } from '@/types/index';
 import type { IndexedContest } from '@/api/indexerClient';
@@ -52,14 +53,16 @@ export function ArenaView({
 
   const creditsAvailable = 100 - creditsUsed;
 
-  const grouped = useMemo(
-    () => ({
-      WK: squad.players.filter((player) => player.role === 'WK'),
-      BAT: squad.players.filter((player) => player.role === 'BAT'),
-      AR: squad.players.filter((player) => player.role === 'AR'),
-      BOWL: squad.players.filter((player) => player.role === 'BOWL')
-    }),
-    [squad.players]
+  const captain = squad.players.find((player) => player.id === squad.captainId) ?? null;
+  const viceCaptain = squad.players.find((player) => player.id === squad.viceCaptainId) ?? null;
+  const fieldPlayers = squad.players.filter((player) => player.id !== squad.captainId && player.id !== squad.viceCaptainId);
+  const pyramidRows = useMemo(
+    () => [
+      fieldPlayers.slice(0, 3),
+      fieldPlayers.slice(3, 7),
+      fieldPlayers.slice(7, 9)
+    ],
+    [fieldPlayers]
   );
 
   const openConfirm = () => {
@@ -144,11 +147,46 @@ export function ArenaView({
                   </button>
                 </div>
 
-                <div className="p-4 space-y-3">
-                  <RoleGroup title="Wicket Keepers" players={grouped.WK} squad={squad} matchStatus={matchStatus} onSetCaptain={onSetCaptain} onSetViceCaptain={onSetViceCaptain} onRemovePlayer={onRemovePlayer} />
-                  <RoleGroup title="Batters" players={grouped.BAT} squad={squad} matchStatus={matchStatus} onSetCaptain={onSetCaptain} onSetViceCaptain={onSetViceCaptain} onRemovePlayer={onRemovePlayer} />
-                  <RoleGroup title="All-Rounders" players={grouped.AR} squad={squad} matchStatus={matchStatus} onSetCaptain={onSetCaptain} onSetViceCaptain={onSetViceCaptain} onRemovePlayer={onRemovePlayer} />
-                  <RoleGroup title="Bowlers" players={grouped.BOWL} squad={squad} matchStatus={matchStatus} onSetCaptain={onSetCaptain} onSetViceCaptain={onSetViceCaptain} onRemovePlayer={onRemovePlayer} />
+                <div className="p-4 md:p-6">
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 px-3 py-6 md:px-6 space-y-4">
+                    <PyramidRow>
+                      <SquadSlot
+                        label="Captain"
+                        player={captain}
+                        selected="captain"
+                        matchStatus={matchStatus}
+                        onSetCaptain={onSetCaptain}
+                        onSetViceCaptain={onSetViceCaptain}
+                        onRemovePlayer={onRemovePlayer}
+                      />
+                    </PyramidRow>
+                    <PyramidRow>
+                      <SquadSlot
+                        label="Vice Captain"
+                        player={viceCaptain}
+                        selected="vice"
+                        matchStatus={matchStatus}
+                        onSetCaptain={onSetCaptain}
+                        onSetViceCaptain={onSetViceCaptain}
+                        onRemovePlayer={onRemovePlayer}
+                      />
+                    </PyramidRow>
+                    {pyramidRows.map((row, rowIndex) => (
+                      <PyramidRow key={rowIndex}>
+                        {Array.from({ length: rowIndex === 0 ? 3 : rowIndex === 1 ? 4 : 2 }).map((_, index) => (
+                          <SquadSlot
+                            key={`${rowIndex}-${index}`}
+                            label="Player"
+                            player={row[index] ?? null}
+                            matchStatus={matchStatus}
+                            onSetCaptain={onSetCaptain}
+                            onSetViceCaptain={onSetViceCaptain}
+                            onRemovePlayer={onRemovePlayer}
+                          />
+                        ))}
+                      </PyramidRow>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -254,75 +292,73 @@ function DataRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function RoleGroup({
-  title,
-  players,
-  squad,
+function PyramidRow({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap items-stretch justify-center gap-2 md:gap-3">{children}</div>;
+}
+
+function SquadSlot({
+  label,
+  player,
+  selected,
   matchStatus,
   onSetCaptain,
   onSetViceCaptain,
   onRemovePlayer
 }: {
-  title: string;
-  players: CricketPlayer[];
-  squad: Squad;
+  label: string;
+  player: CricketPlayer | null;
+  selected?: 'captain' | 'vice';
   matchStatus: string;
   onSetCaptain: (playerId: string) => void;
   onSetViceCaptain: (playerId: string) => void;
   onRemovePlayer: (playerId: string) => void;
 }) {
-  return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden">
-      <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-        <h3 className="font-semibold text-slate-900">{title}</h3>
-        <span className="text-xs text-slate-500">{players.length}</span>
+  const locked = matchStatus === 'LOCKED';
+  if (!player) {
+    return (
+      <div className="min-h-28 w-[8.5rem] rounded-xl border border-dashed border-slate-300 bg-white/70 px-3 py-4 text-center">
+        <div className="mx-auto mb-2 h-9 w-9 rounded-full bg-slate-100" />
+        <p className="text-xs font-semibold text-slate-400">{label}</p>
+        <p className="mt-1 text-[11px] text-slate-400">Empty slot</p>
       </div>
+    );
+  }
 
-      {players.length === 0 ? (
-        <p className="px-3 py-3 text-sm text-slate-500">No players selected.</p>
-      ) : (
-        <div className="divide-y divide-slate-200">
-          {players.map((player) => {
-            const captain = squad.captainId === player.id;
-            const viceCaptain = squad.viceCaptainId === player.id;
-            return (
-              <div key={player.id} className="px-3 py-2 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
-                  {player.name.slice(0, 1)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-900 truncate">{player.name}</p>
-                  <p className="text-xs text-slate-500">{player.team} • {player.credits} credits</p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => onSetCaptain(player.id)}
-                    disabled={matchStatus === 'LOCKED'}
-                    className={`rounded px-2 py-1 text-xs font-semibold ${captain ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700'}`}
-                  >
-                    C
-                  </button>
-                  <button
-                    onClick={() => onSetViceCaptain(player.id)}
-                    disabled={matchStatus === 'LOCKED'}
-                    className={`rounded px-2 py-1 text-xs font-semibold ${viceCaptain ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-700'}`}
-                  >
-                    VC
-                  </button>
-                  <button
-                    onClick={() => onRemovePlayer(player.id)}
-                    disabled={matchStatus === 'LOCKED'}
-                    className="rounded p-1 text-red-600 hover:bg-red-50"
-                    aria-label={`Remove ${player.name}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+  return (
+    <div className="w-[8.5rem] rounded-xl border border-slate-200 bg-white p-3 text-center shadow-sm">
+      <div className="mx-auto h-10 w-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-bold">
+        {player.name.slice(0, 1)}
+      </div>
+      <p className="mt-2 truncate text-sm font-semibold text-slate-900">{player.name}</p>
+      <p className="mt-0.5 truncate text-xs text-slate-500">{player.team}</p>
+      <div className="mt-2 flex items-center justify-center gap-1 text-[11px]">
+        <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700">{player.role}</span>
+        <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700">{player.credits}C</span>
+      </div>
+      <div className="mt-3 flex items-center justify-center gap-1">
+        <button
+          onClick={() => onSetCaptain(player.id)}
+          disabled={locked}
+          className={`rounded px-2 py-1 text-xs font-semibold ${selected === 'captain' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700'}`}
+        >
+          C
+        </button>
+        <button
+          onClick={() => onSetViceCaptain(player.id)}
+          disabled={locked}
+          className={`rounded px-2 py-1 text-xs font-semibold ${selected === 'vice' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}
+        >
+          VC
+        </button>
+        <button
+          onClick={() => onRemovePlayer(player.id)}
+          disabled={locked}
+          className="rounded p-1 text-red-600 hover:bg-red-50"
+          aria-label={`Remove ${player.name}`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   );
 }

@@ -12,7 +12,7 @@ interface SidebarProps {
 
 const PLAYER_MENU = [
   { icon: LayoutDashboard, label: 'Dashboard', view: 'DASHBOARD' as ViewType },
-  { icon: Zap, label: 'Arena', view: 'ARENA' as ViewType },
+  { icon: Zap, label: 'Build Squad', view: 'ARENA' as ViewType },
   { icon: Trophy, label: 'Leaderboard', view: 'LEADERBOARD' as ViewType },
   { icon: Gift, label: 'Rewards', view: 'REWARDS' as ViewType },
 ];
