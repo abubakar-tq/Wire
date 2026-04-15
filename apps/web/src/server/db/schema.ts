@@ -36,6 +36,9 @@ export const teams = appSchema.table("teams", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });
 
+export type TeamRow = typeof teams.$inferSelect;
+export type NewTeamRow = typeof teams.$inferInsert;
+
 export const nftMetadata = appSchema.table("nft_metadata", {
   id: text("id").primaryKey(), // e.g. "passport-1", "squad-42"
   nftType: text("nft_type").notNull(), // "passport" or "squad"

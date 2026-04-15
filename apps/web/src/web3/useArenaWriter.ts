@@ -7,6 +7,7 @@ import { indexerKeys } from "@/api/useIndexerData";
 import type { HexString } from "@/api/indexerClient";
 import { contractsConfigured } from "@/contracts/addresses";
 import { configuredChainId, wireFluidTestnet } from "@/chains/wireFluidTestnet";
+import { normalizeContractError } from "@/utils/contractErrors";
 
 export function useArenaWriter() {
   const queryClient = useQueryClient();
@@ -75,8 +76,8 @@ export function useArenaWriter() {
 
   useEffect(() => {
     if (!receipt.isError) return;
-    setLocalError(receipt.error?.message ?? "Transaction failed");
-  }, [receipt.error?.message, receipt.isError]);
+    setLocalError(normalizeContractError(receipt.error));
+  }, [receipt.error, receipt.isError]);
 
   const write = async (args: Parameters<typeof writer.writeContractAsync>[0]) => {
     writer.reset();
@@ -185,7 +186,17 @@ export function useArenaWriter() {
       }
     }
 
-    const nextHash = await writer.writeContractAsync(args);
+    let nextHash: HexString;
+    try {
+      nextHash = await writer.writeContractAsync(args);
+    } catch (error) {
+      const message = normalizeContractError(error);
+      setLocalError(message);
+      if (error instanceof Error && error.message === message) {
+        throw error;
+      }
+      throw new Error(message);
+    }
     setHash(nextHash);
     return nextHash;
   };

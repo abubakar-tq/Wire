@@ -86,6 +86,7 @@ export function useLiveArenaData(selectedContestId?: string) {
     selectedContest,
     selectedMatch: matchQuery.data?.match ?? null,
     contestDetail: contestQuery.data ?? null,
+    contests: contestsQuery.data ?? [],
     availablePlayers,
     leaderboard,
     isLoading: contestsQuery.isLoading || matchQuery.isLoading || contestQuery.isLoading || profilesQuery.isLoading,

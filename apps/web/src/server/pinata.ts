@@ -21,7 +21,7 @@ export function getPinataClient() {
 export async function uploadNftImage(name: string, svgContent: string) {
   const pinata = getPinataClient();
   const file = new File([svgContent], `${name}.svg`, { type: "image/svg+xml" });
-  const upload = await pinata.upload.file(file);
+  const upload = await pinata.upload.public.file(file).name(`${name}.svg`);
   return `ipfs://${upload.cid}`;
 }
 
@@ -31,6 +31,6 @@ export async function uploadNftImage(name: string, svgContent: string) {
  */
 export async function uploadNftMetadata(name: string, metadata: Record<string, any>) {
   const pinata = getPinataClient();
-  const upload = await pinata.upload.json(metadata);
+  const upload = await pinata.upload.public.json(metadata).name(`${name}.json`);
   return `ipfs://${upload.cid}`;
 }

@@ -52,3 +52,15 @@ export async function savePlayerProfiles(players: PlayerProfileInput[], init?: R
   const payload = (await response.json()) as { players?: PlayerProfile[] };
   return payload.players ?? [];
 }
+
+export async function deletePlayerProfile(playerId: number, init?: RequestInit): Promise<void> {
+  const response = await fetch(`/api/players/${playerId}`, {
+    method: "DELETE",
+    ...init
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? `Failed to delete player (${response.status})`);
+  }
+}

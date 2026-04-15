@@ -7,6 +7,7 @@ import { contractAddresses } from '@/contracts/addresses';
 import { useCurrentUserPassport } from '@/api/useIndexerData';
 import { useArenaWriter } from '@/web3/useArenaWriter';
 import { formatWire } from '@/utils/arenaFormat';
+import { getClaimActionState } from '@/utils/actionStates';
 import { getPassportLevel } from '@/utils/passportLevel';
 
 interface RewardsViewProps {
@@ -22,6 +23,8 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
   const claimableReward = passport.data?.balance?.claimableReward ?? '0';
   const refundableAmount = passport.data?.balance?.refundableAmount ?? '0';
   const profile = passport.data?.passport ?? null;
+  const rewardClaimState = getClaimActionState(claimableReward, writer.isBusy, 'No rewards are available to claim yet.');
+  const refundClaimState = getClaimActionState(refundableAmount, writer.isBusy, 'No refunds are available to claim.');
 
   const handleClaimRewards = async () => {
     await writer.write({
@@ -110,11 +113,13 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
             <p className="mt-3 text-2xl font-bold text-slate-900">{formatWire(claimableReward)}</p>
             <button
               onClick={handleClaimRewards}
-              disabled={BigInt(claimableReward) === 0n || writer.isSubmitting}
+              disabled={rewardClaimState.disabled}
+              title={rewardClaimState.reason}
               className="mt-4 w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
             >
               Claim Reward
             </button>
+            {rewardClaimState.reason ? <p className="mt-2 text-xs text-slate-500">{rewardClaimState.reason}</p> : null}
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -125,11 +130,13 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
             <p className="mt-3 text-2xl font-bold text-slate-900">{formatWire(refundableAmount)}</p>
             <button
               onClick={handleClaimRefund}
-              disabled={BigInt(refundableAmount) === 0n || writer.isSubmitting}
+              disabled={refundClaimState.disabled}
+              title={refundClaimState.reason}
               className="mt-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
             >
               Claim Refund
             </button>
+            {refundClaimState.reason ? <p className="mt-2 text-xs text-slate-500">{refundClaimState.reason}</p> : null}
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
