@@ -91,6 +91,10 @@ abstract contract FantasyArenaTestBase is Test {
         _seedPlayers(MATCH_ID);
     }
 
+    function _warpPastMatchLock() internal {
+        vm.warp(block.timestamp + 1 days + 1);
+    }
+
     function _createContest() internal {
         contests.createContest(CONTEST_ID, MATCH_ID, ENTRY_FEE, MAX_ENTRIES_PER_CONTEST, MAX_ENTRIES_PER_WALLET);
     }
@@ -185,6 +189,9 @@ abstract contract FantasyArenaTestBase is Test {
     }
 
     function _submitLinearStats(uint256 matchId) internal {
+        if (!registry.isLocked(matchId)) {
+            _warpPastMatchLock();
+        }
         (uint16[] memory playerIds,,) = _playerPool();
         PlayerStats[] memory stats = new PlayerStats[](playerIds.length);
         for (uint256 i = 0; i < playerIds.length; ++i) {

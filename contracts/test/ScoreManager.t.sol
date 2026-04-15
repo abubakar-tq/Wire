@@ -3,7 +3,13 @@ pragma solidity ^0.8.26;
 
 import {FantasyArenaTestBase} from "./FantasyArenaTestBase.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {DuplicatePlayer, InvalidArrayLength, PlayerNotAllowed, StatsAlreadySubmitted} from "../src/errors/Errors.sol";
+import {
+    DuplicatePlayer,
+    InvalidArrayLength,
+    PlayerNotAllowed,
+    StatsAlreadySubmitted,
+    StatsBeforeMatchLock
+} from "../src/errors/Errors.sol";
 import {MatchStatus, PlayerStats} from "../src/types/Structs.sol";
 
 contract ScoreManagerTest is FantasyArenaTestBase {
@@ -25,6 +31,7 @@ contract ScoreManagerTest is FantasyArenaTestBase {
 
     function testRejectInvalidPlayerIds() public {
         _createMatchWithPlayers();
+        _warpPastMatchLock();
         uint16[] memory playerIds = new uint16[](1);
         PlayerStats[] memory stats = new PlayerStats[](1);
         playerIds[0] = 99;
@@ -36,6 +43,7 @@ contract ScoreManagerTest is FantasyArenaTestBase {
 
     function testRejectLengthMismatch() public {
         _createMatchWithPlayers();
+        _warpPastMatchLock();
         uint16[] memory playerIds = new uint16[](2);
         PlayerStats[] memory stats = new PlayerStats[](1);
         playerIds[0] = 1;
@@ -48,6 +56,7 @@ contract ScoreManagerTest is FantasyArenaTestBase {
 
     function testRejectDuplicatePlayerStats() public {
         _createMatchWithPlayers();
+        _warpPastMatchLock();
         uint16[] memory playerIds = new uint16[](2);
         PlayerStats[] memory stats = new PlayerStats[](2);
         playerIds[0] = 1;
@@ -58,10 +67,33 @@ contract ScoreManagerTest is FantasyArenaTestBase {
         scores.submitMatchStats(MATCH_ID, playerIds, stats);
     }
 
+    function testRejectStatsBeforeMatchLock() public {
+        _createMatchWithPlayers();
+        (uint16[] memory playerIds,,) = _playerPool();
+        PlayerStats[] memory stats = new PlayerStats[](playerIds.length);
+
+        vm.prank(publisher);
+        vm.expectRevert(abi.encodeWithSelector(StatsBeforeMatchLock.selector, MATCH_ID));
+        scores.submitMatchStats(MATCH_ID, playerIds, stats);
+    }
+
+    function testRejectPartialPlayerStats() public {
+        _createMatchWithPlayers();
+        _warpPastMatchLock();
+        uint16[] memory playerIds = new uint16[](1);
+        PlayerStats[] memory stats = new PlayerStats[](1);
+        playerIds[0] = 1;
+
+        vm.prank(publisher);
+        vm.expectRevert(InvalidArrayLength.selector);
+        scores.submitMatchStats(MATCH_ID, playerIds, stats);
+    }
+
     function testComputeCorrectPlayerPoints() public {
         _createMatchWithPlayers();
-        uint16[] memory playerIds = new uint16[](2);
-        PlayerStats[] memory stats = new PlayerStats[](2);
+        _warpPastMatchLock();
+        (uint16[] memory playerIds,,) = _playerPool();
+        PlayerStats[] memory stats = new PlayerStats[](playerIds.length);
         playerIds[0] = 1;
         stats[0] = PlayerStats({
             runs: 30,
@@ -91,10 +123,9 @@ contract ScoreManagerTest is FantasyArenaTestBase {
 
     function testSubmitStatsEmitsIndexerEvents() public {
         _createMatchWithPlayers();
-        uint16[] memory playerIds = new uint16[](2);
-        PlayerStats[] memory stats = new PlayerStats[](2);
-        playerIds[0] = 1;
-        playerIds[1] = 2;
+        _warpPastMatchLock();
+        (uint16[] memory playerIds,,) = _playerPool();
+        PlayerStats[] memory stats = new PlayerStats[](playerIds.length);
         stats[0].runs = 30;
         stats[1].duck = true;
 
@@ -103,8 +134,8 @@ contract ScoreManagerTest is FantasyArenaTestBase {
         scores.submitMatchStats(MATCH_ID, playerIds, stats);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(_countLogsByTopic(logs, PLAYER_STATS_RECORDED_TOPIC), 2);
-        assertEq(_countLogsByTopic(logs, PLAYER_POINTS_COMPUTED_TOPIC), 2);
+        assertEq(_countLogsByTopic(logs, PLAYER_STATS_RECORDED_TOPIC), playerIds.length);
+        assertEq(_countLogsByTopic(logs, PLAYER_POINTS_COMPUTED_TOPIC), playerIds.length);
         assertEq(_countLogsByTopic(logs, MATCH_STATS_SUBMITTED_TOPIC), 1);
     }
 

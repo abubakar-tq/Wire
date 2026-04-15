@@ -10,6 +10,7 @@ import {
     MatchNotFound,
     PlayerNotAllowed,
     StatsAlreadySubmitted,
+    StatsBeforeMatchLock,
     TooManyPlayers,
     ZeroAddress
 } from "./errors/Errors.sol";
@@ -39,18 +40,25 @@ contract ScoreManager is AccessControl {
     {
         MatchInfo memory info = matchRegistry.getMatch(matchId);
         if (!info.exists) revert MatchNotFound();
+        if (!matchRegistry.isLocked(matchId)) revert StatsBeforeMatchLock(matchId);
         if (_statsSubmitted[matchId]) revert StatsAlreadySubmitted(matchId);
         if (playerIds.length == 0 || playerIds.length != stats.length) revert InvalidArrayLength();
         if (playerIds.length > MAX_PLAYERS_PER_MATCH) revert TooManyPlayers();
 
-        _statsSubmitted[matchId] = true;
         for (uint256 i = 0; i < playerIds.length; ++i) {
             uint16 playerId = playerIds[i];
             if (!matchRegistry.isPlayerAllowed(matchId, playerId)) revert PlayerNotAllowed(matchId, playerId);
             for (uint256 j = 0; j < i; ++j) {
                 if (playerIds[j] == playerId) revert DuplicatePlayer(playerId);
             }
+        }
 
+        uint16[] memory rosterPlayerIds = matchRegistry.getMatchPlayerIds(matchId);
+        if (playerIds.length != rosterPlayerIds.length) revert InvalidArrayLength();
+
+        _statsSubmitted[matchId] = true;
+        for (uint256 i = 0; i < playerIds.length; ++i) {
+            uint16 playerId = playerIds[i];
             PlayerStats calldata playerStats = stats[i];
             int32 points = ScoringRules.calculate(playerStats);
             _rawStatsByMatch[matchId][playerId] = playerStats;
