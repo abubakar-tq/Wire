@@ -194,22 +194,6 @@ export function ProtocolView() {
           </div>
         </section>
       </div>
-
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
-        <h2 className="font-bold text-slate-900 mb-3">Protocol Health</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-700">
-          {[
-            'Deploy core smart contracts to the WireFluid Testnet or Local environment.',
-            'Seed blockchain configurations through forge scripts.',
-            'Maintain the Ponder indexer synchronously processing chain state blocks.',
-            'Utilize this administrative module to mint token assets globally.'
-          ].map((step, index) => (
-            <div key={step} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <span className="font-semibold text-slate-900">{index + 1}.</span> {step}
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
