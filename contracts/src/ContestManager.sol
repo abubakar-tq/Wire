@@ -111,6 +111,7 @@ contract ContestManager is AccessControl, ReentrancyGuard {
         if (!info.exists) revert ContestNotFound();
         if (matchRegistry.isLocked(matchId)) revert MatchLocked(matchId);
         if (contestIdByMatch[matchId] != 0) revert MatchAlreadyHasContest(matchId, contestIdByMatch[matchId]);
+        if (matchRegistry.getMatchPlayerIds(matchId).length == 0) revert InvalidContestConfig();
         if (
             entryFee == 0 || maxEntries == 0 || maxEntries > MAX_ENTRIES_PER_CONTEST || maxEntriesPerWallet == 0
                 || maxEntriesPerWallet > MAX_ENTRIES_PER_WALLET || maxEntriesPerWallet > maxEntries
@@ -129,6 +130,7 @@ contract ContestManager is AccessControl, ReentrancyGuard {
             exists: true
         });
         contestIdByMatch[matchId] = contestId;
+        matchRegistry.freezeMatchPlayers(matchId);
 
         emit ContestCreated(contestId, matchId, entryFee, maxEntries, maxEntriesPerWallet, msg.sender);
     }

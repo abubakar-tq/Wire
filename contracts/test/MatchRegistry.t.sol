@@ -10,7 +10,8 @@ import {
     InvalidStatusTransition,
     InvalidTeamSide,
     MatchAlreadyExists,
-    MatchLocked
+    MatchLocked,
+    PlayerPoolFrozen
 } from "../src/errors/Errors.sol";
 import {MatchInfo, MatchStatus, PlayerMeta, RoleType} from "../src/types/Structs.sol";
 
@@ -109,6 +110,15 @@ contract MatchRegistryTest is FantasyArenaTestBase {
         (uint16[] memory ids, uint8[] memory roles, uint8[] memory sides) = _playerPool();
 
         vm.expectRevert(abi.encodeWithSelector(MatchLocked.selector, MATCH_ID));
+        registry.setMatchPlayers(MATCH_ID, ids, roles, sides);
+    }
+
+    function testSetPlayersRevertsAfterPoolFrozen() public {
+        _createMatchWithPlayers();
+        registry.freezeMatchPlayers(MATCH_ID);
+        (uint16[] memory ids, uint8[] memory roles, uint8[] memory sides) = _playerPool();
+
+        vm.expectRevert(abi.encodeWithSelector(PlayerPoolFrozen.selector, MATCH_ID));
         registry.setMatchPlayers(MATCH_ID, ids, roles, sides);
     }
 

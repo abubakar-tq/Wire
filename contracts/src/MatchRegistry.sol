@@ -22,6 +22,7 @@ import {
     MatchAlreadyExists,
     MatchLocked,
     MatchNotFound,
+    PlayerPoolFrozen,
     PlayerNotAllowed,
     TooManyPlayers
 } from "./errors/Errors.sol";
@@ -34,6 +35,7 @@ contract MatchRegistry is AccessControl {
     mapping(uint256 => MatchInfo) private _matches;
     mapping(uint256 => mapping(uint16 => PlayerMeta)) private _matchPlayers;
     mapping(uint256 => uint16[]) private _matchPlayerIds;
+    mapping(uint256 => bool) public playerPoolFrozen;
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -79,6 +81,7 @@ contract MatchRegistry is AccessControl {
     ) external onlyRole(OPERATOR_ROLE) {
         _requireMatch(matchId);
         if (isLocked(matchId)) revert MatchLocked(matchId);
+        if (playerPoolFrozen[matchId]) revert PlayerPoolFrozen(matchId);
         if (playerIds.length == 0 || playerIds.length != roles.length || playerIds.length != teamSides.length) {
             revert InvalidArrayLength();
         }
@@ -106,6 +109,11 @@ contract MatchRegistry is AccessControl {
         }
 
         emit MatchPlayersSet(matchId, playerIds.length, playerIds, roles, teamSides, msg.sender);
+    }
+
+    function freezeMatchPlayers(uint256 matchId) external onlyStatusUpdater {
+        _requireMatch(matchId);
+        playerPoolFrozen[matchId] = true;
     }
 
     function updateMatchStatus(uint256 matchId, MatchStatus newStatus) external onlyStatusUpdater {

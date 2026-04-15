@@ -11,6 +11,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {
     ContestAlreadyExists,
     ContestFull,
+    InvalidContestConfig,
     MatchAlreadyHasContest,
     MatchLocked,
     NoRefund,
@@ -20,7 +21,7 @@ import {
     WalletEntryLimitReached,
     WrongEntryFee
 } from "../src/errors/Errors.sol";
-import {Contest, Entry, MatchStatus} from "../src/types/Structs.sol";
+import {Contest, Entry, MatchStatus, PlayerStats} from "../src/types/Structs.sol";
 
 contract ContestManagerTest is FantasyArenaTestBase {
     bytes32 private constant ENTRY_SCORE_COMPUTED_TOPIC =
@@ -71,6 +72,13 @@ contract ContestManagerTest is FantasyArenaTestBase {
 
         vm.expectRevert(abi.encodeWithSelector(MatchAlreadyHasContest.selector, MATCH_ID, CONTEST_ID));
         contests.createContest(101, MATCH_ID, ENTRY_FEE, 25, 3);
+    }
+
+    function testRejectContestCreationBeforePlayersSeeded() public {
+        _createMatch();
+
+        vm.expectRevert(InvalidContestConfig.selector);
+        _createContest();
     }
 
     function testJoinContestSuccessAndMintsNFT() public {
