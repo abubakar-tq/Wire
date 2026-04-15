@@ -804,20 +804,32 @@ export function MatchView() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-slate-900">{formatWire(contest.entryFee)}</span>
-                  <button
-                    onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'finalizeContest', args: [BigInt(contest.contestId)] })}
-                    disabled={writer.isSubmitting || contest.finalized || contest.cancelled}
-                    className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                  >
-                    Finalize
-                  </button>
-                  <button
-                    onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'cancelContest', args: [BigInt(contest.contestId)] })}
-                    disabled={writer.isSubmitting || contest.finalized || contest.cancelled}
-                    className="rounded bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
+                  {(() => {
+                    const matchForContest = matches.data?.find(m => m.matchId === contest.matchId);
+                    const isTournamentStarted = matchForContest ? Date.now() >= Number(matchForContest.startTime) * 1000 : false;
+                    const isScoreUploaded = matchForContest ? matchForContest.status >= 2 : false;
+                    
+                    return (
+                      <>
+                        <button
+                          onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'finalizeContest', args: [BigInt(contest.contestId)] })}
+                          disabled={writer.isSubmitting || contest.finalized || contest.cancelled || !isScoreUploaded}
+                          title={!isScoreUploaded ? "Match score must be submitted first" : ""}
+                          className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                        >
+                          Finalize
+                        </button>
+                        <button
+                          onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'cancelContest', args: [BigInt(contest.contestId)] })}
+                          disabled={writer.isSubmitting || contest.finalized || contest.cancelled || isTournamentStarted}
+                          title={isTournamentStarted ? "Cannot cancel after match start time" : ""}
+                          className="rounded bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
