@@ -4,19 +4,19 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import dotenv from "dotenv";
-dotenv.config({ path: path.join(__dirname, "../.env") });
-dotenv.config({ path: path.join(__dirname, "../../../.env") });
+dotenv.config({ path: path.join(__dirname, "../.env.local") });
+dotenv.config({ path: path.join(__dirname, "../../../.env.local") });
 
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, inArray } from "drizzle-orm";
 import { pgTable, integer, text, timestamp, bigint, jsonb, pgSchema } from "drizzle-orm/pg-core";
 import pinataSDK from "@pinata/sdk";
 import stream from "stream";
 
 // --- Database & Pinata Config ---
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is required");
+const connectionString = process.env.PLAYER_DATABASE_URL || process.env.DATABASE_URL;
+if (!connectionString) throw new Error("PLAYER_DATABASE_URL or DATABASE_URL is required");
 
 const queryConnection = neon(connectionString);
 const db = drizzle(queryConnection);
@@ -63,15 +63,14 @@ const nft_metadata = appSchema.table("nft_metadata", {
 
 // --- Helper Functions ---
 
-async function uploadToIPFS(name, svg, metadata) {
+async function uploadToIPFS(name, buffer, metadata) {
   try {
-    // Generate buffer from SVG
-    const svgStream = new stream.Readable();
-    svgStream.push(svg);
-    svgStream.push(null);
+    const bufferStream = new stream.Readable();
+    bufferStream.push(buffer);
+    bufferStream.push(null);
 
-    const imgUpload = await pinata.pinFileToIPFS(svgStream, {
-      pinataMetadata: { name: `${name}.svg` }
+    const imgUpload = await pinata.pinFileToIPFS(bufferStream, {
+      pinataMetadata: { name: `${name}.png` }
     });
     const imageUri = `ipfs://${imgUpload.IpfsHash}`;
 
@@ -90,41 +89,12 @@ async function uploadToIPFS(name, svg, metadata) {
   }
 }
 
-function generatePassportSvg(p) {
-  return `<svg width="400" height="600" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#2a2a72;stop-opacity:1" />
-        <stop offset="100%" style="stop-color:#009ffd;stop-opacity:1" />
-      </linearGradient>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#grad)" rx="20" />
-    <text x="50%" y="80" text-anchor="middle" fill="white" font-family="Arial" font-size="28" font-weight="bold">WIREFLUID PASSPORT</text>
-    <text x="50%" y="150" text-anchor="middle" fill="#00d2ff" font-family="Arial" font-size="22">TOKEN #${p.tokenId}</text>
-    <line x1="10%" y1="200" x2="90%" y2="200" stroke="white" stroke-width="2" opacity="0.3" />
-    <text x="10%" y="260" fill="white" font-family="Arial" font-size="18">CONTESTS: ${p.contestsEntered}</text>
-    <text x="10%" y="300" fill="white" font-family="Arial" font-size="18">WINS: ${p.contestsWon}</text>
-    <text x="10%" y="340" fill="white" font-family="Arial" font-size="18">REWARDS: ${p.totalRewardsClaimed.toString()}</text>
-    <text x="50%" y="550" text-anchor="middle" fill="white" font-family="Arial" font-size="14" opacity="0.5">${p.user}</text>
-  </svg>`;
-}
-
-function generateSquadSvg(s, players) {
-  const playerList = players.map((p, i) => `<text x="10%" y="${220 + i * 30}" fill="white" font-family="Arial" font-size="14">${i + 1}. ${p.displayName} (${p.teamCode}) ${p.playerId === s.captainId ? '[C]' : p.playerId === s.viceCaptainId ? '[VC]' : ''}</text>`).join("");
-  return `<svg width="400" height="600" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#330000;stop-opacity:1" />
-        <stop offset="100%" style="stop-color:#ff0044;stop-opacity:1" />
-      </linearGradient>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#grad)" rx="20" />
-    <text x="50%" y="80" text-anchor="middle" fill="white" font-family="Arial" font-size="28" font-weight="bold">FANTASY SQUAD</text>
-    <text x="50%" y="150" text-anchor="middle" fill="#ffcc00" font-family="Arial" font-size="22">TOKEN #${s.tokenId}</text>
-    <line x1="10%" y1="180" x2="90%" y2="180" stroke="white" stroke-width="2" opacity="0.3" />
-    ${playerList}
-    <text x="50%" y="580" text-anchor="middle" fill="white" font-family="Arial" font-size="12" opacity="0.5">MATCH ID: ${s.matchId}</text>
-  </svg>`;
+async function fetchAvatarBuffer(seed) {
+  const url = `https://api.dicebear.com/9.x/bottts-neutral/png?seed=${seed}&backgroundColor=e5e7eb`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch avatar: ${res.statusText}`);
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer);
 }
 
 // --- Logic ---
@@ -148,7 +118,7 @@ async function syncPassports() {
 
   for (const p of passportsToSync) {
     console.log(`Processing Passport #${p.tokenId}...`);
-    const svg = generatePassportSvg(p);
+    const buffer = await fetchAvatarBuffer(`passport-${p.tokenId}`);
     const metadata = {
       name: `WireFluid Passport #${p.tokenId}`,
       description: "A dynamic passport tracking your WireFluid activity and stats.",
@@ -158,7 +128,7 @@ async function syncPassports() {
         { trait_type: "Total Rewards", value: p.totalRewardsClaimed.toString() }
       ]
     };
-    const { imageUri, metadataUri } = await uploadToIPFS(`passport-${p.tokenId}`, svg, metadata);
+    const { imageUri, metadataUri } = await uploadToIPFS(`passport-${p.tokenId}`, buffer, metadata);
     await db.insert(nft_metadata).values({
       id: `passport-${p.tokenId}`,
       nftType: "passport",
@@ -188,8 +158,8 @@ async function syncSquads() {
 
   for (const s of squadsToSync) {
     console.log(`Processing Squad #${s.tokenId}...`);
-    const playersInSquad = await db.select().from(app_players).where(sql`${app_players.playerId} IN (${sql.join(s.playerIds)})`);
-    const svg = generateSquadSvg(s, playersInSquad);
+    const playersInSquad = await db.select().from(app_players).where(inArray(app_players.playerId, s.playerIds));
+    const buffer = await fetchAvatarBuffer(`squad-${s.tokenId}`);
     const metadata = {
       name: `WireFluid Fantasy Squad #${s.tokenId}`,
       description: `A custom-built fantasy squad for Match #${s.matchId}.`,
@@ -198,7 +168,7 @@ async function syncSquads() {
         { trait_type: "Captain ID", value: s.captainId }
       ]
     };
-    const { imageUri, metadataUri } = await uploadToIPFS(`squad-${s.tokenId}`, svg, metadata);
+    const { imageUri, metadataUri } = await uploadToIPFS(`squad-${s.tokenId}`, buffer, metadata);
     await db.insert(nft_metadata).values({
       id: `squad-${s.tokenId}`,
       nftType: "squad",
@@ -210,6 +180,13 @@ async function syncSquads() {
   }
 }
 
+/**
+ * @function run
+ * @description Master synchronization pipeline. 
+ * Orchestrates the bridging of PostgreSQL indexer states to Pinata Cloud IPFS.
+ * It natively extracts generated PNG buffers from external Web2 endpoints, authenticates
+ * via the Pinata SDK, and permanently maps the immutable Web3 assets back to the DB to be securely exposed.
+ */
 async function run() {
   if (!process.env.PINATA_JWT) { console.error("❌ SKIPPING SYNC: PINATA_JWT is not set in .env"); return; }
   try {

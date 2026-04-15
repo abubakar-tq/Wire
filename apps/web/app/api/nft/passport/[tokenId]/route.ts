@@ -3,43 +3,53 @@ import { getDb } from "@/server/db";
 import { nftMetadata } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 
-export const runtime = "nodejs";
-
-export async function GET(
-  request: Request,
-  { params }: { params: { tokenId: string } }
-) {
-  const tokenId = parseInt(params.tokenId);
+/**
+ * @route GET /api/nft/passport/[tokenId]
+ * @description Decentralized metadata resolution API for Wirefluid Passports.
+ * Next.js 15+ native App Router endpoint that securely intercepts on-chain tokenURI requests,
+ * queries the Neon database for the pinned IPFS gateway mapping, and resolves the actual 
+ * Pinata JSON directly back to the requesting wallet (e.g., MetaMask).
+ *
+ * @param request Standard HTTP Request
+ * @param context Dynamic routing context containing the deeply awaited token parameters.
+ */
+export async function GET(request: Request, context: { params: Promise<{ tokenId: string }> }) {
+  const { tokenId: tokenIdStr } = await context.params;
+  const tokenId = parseInt(tokenIdStr);
   if (isNaN(tokenId)) {
-    return NextResponse.json({ error: "Invalid Token ID" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid tokenId" }, { status: 400 });
   }
 
-  const db = getDb();
-  const [record] = await db
-    .select()
-    .from(nftMetadata)
-    .where(
-      and(
-        eq(nftMetadata.nftType, "passport"),
-        eq(nftMetadata.tokenId, tokenId)
-      )
-    )
-    .limit(1);
+  try {
+    const db = getDb();
+    const [metadata] = await db
+      .select({
+        metadataUri: nftMetadata.metadataUri
+      })
+      .from(nftMetadata)
+      .where(and(eq(nftMetadata.nftType, "passport"), eq(nftMetadata.tokenId, tokenId)))
+      .limit(1);
 
-  if (!record || !record.metadataUri) {
-    // If not synced yet, return a generic "Syncing..." response instead of a 404
-    // to avoid wallets caching a negative result.
-    return NextResponse.json({
-      name: `WireFluid Passport #${tokenId}`,
-      description: "Syncing metadata to IPFS...",
-      image: "https://via.placeholder.com/400x600?text=Syncing+Metadata..."
-    });
+    if (!metadata || !metadata.metadataUri) {
+      // Return a placeholder structure to satisfy MetaMask early
+      return NextResponse.json({
+        name: `WireFluid Passport #${tokenId}`,
+        description: "Processing dynamic metadata...",
+        image: `https://api.dicebear.com/9.x/bottts-neutral/png?seed=passport-${tokenId}&backgroundColor=e5e7eb`
+      });
+    }
+
+    const gatewayUrl = metadata.metadataUri.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
+    const response = await fetch(gatewayUrl);
+    
+    if (!response.ok) {
+      throw new Error("Failed to fetch from Pinata");
+    }
+
+    const jsonData = await response.json();
+    return NextResponse.json(jsonData);
+  } catch (error) {
+    console.error("Endpoint Error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-
-  // Generate the gateway URL. 
-  // Standard IPFS uris like ipfs://CID need to be converted to a gateway URL for redirects.
-  const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL ? `https://${process.env.NEXT_PUBLIC_GATEWAY_URL}/ipfs/` : "https://gateway.pinata.cloud/ipfs/";
-  const cid = record.metadataUri.replace("ipfs://", "");
-  
-  return NextResponse.redirect(new URL(`${gateway}${cid}`));
 }
