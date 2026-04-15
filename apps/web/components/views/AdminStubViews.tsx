@@ -194,7 +194,6 @@ export function ProtocolView() {
           </div>
         </section>
       </div>
-      </div>
     </div>
   );
 }
