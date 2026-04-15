@@ -59,6 +59,9 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
     () => new Map((profiles.data ?? []).map((profile) => [profile.playerId, profile])),
     [profiles.data]
   );
+  
+  const [importJsonText, setImportJsonText] = useState('');
+  const [importError, setImportError] = useState('');
 
   useEffect(() => {
     if (!defaultMatchId || matchId) return;
@@ -76,6 +79,39 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
     setRows((current) =>
       current.map((row) => (row.playerId === playerId ? { ...row, [field]: value } : row))
     );
+  };
+
+  const handleImportJson = () => {
+    setImportError('');
+    if (!importJsonText.trim()) return;
+    try {
+      const parsed = JSON.parse(importJsonText);
+      if (!Array.isArray(parsed)) throw new Error('JSON root must be an array of player objects');
+
+      setRows((current) => current.map((row) => {
+        const imported = parsed.find((p: any) => Number(p.playerId) === row.playerId);
+        if (!imported) return row;
+        return {
+          ...row,
+          runs: Number(imported.runs ?? row.runs),
+          fours: Number(imported.fours ?? row.fours),
+          sixes: Number(imported.sixes ?? row.sixes),
+          wickets: Number(imported.wickets ?? row.wickets),
+          maidens: Number(imported.maidens ?? row.maidens),
+          catches: Number(imported.catches ?? row.catches),
+          stumpings: Number(imported.stumpings ?? row.stumpings),
+          runOutDirect: Number(imported.runOutDirect ?? row.runOutDirect),
+          runOutIndirect: Number(imported.runOutIndirect ?? row.runOutIndirect),
+          duck: Boolean(imported.duck ?? row.duck),
+          inStartingXI: Boolean(imported.inStartingXI ?? row.inStartingXI),
+          substituteAppearance: Boolean(imported.substituteAppearance ?? row.substituteAppearance),
+        };
+      }));
+      setImportJsonText('');
+      alert("Scores imported successfully!");
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : 'Invalid JSON');
+    }
   };
 
   const submitStats = async () => {
@@ -147,6 +183,26 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
           <p className="text-sm text-slate-600">Players loaded</p>
           <p className="text-2xl font-bold text-slate-900">{rows.length}</p>
         </div>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-slate-200 p-4 bg-slate-50">
+        <label className="block text-sm font-semibold text-slate-700 mb-2">Bulk Import Scores (JSON)</label>
+        <p className="text-xs text-slate-500 mb-2">
+          Paste an array of JSON objects. E.g. <code className="bg-slate-200 px-1 rounded">{`[{"playerId": 1, "runs": 50, "wickets": 2}]`}</code>
+        </p>
+        <textarea
+          value={importJsonText}
+          onChange={(e) => setImportJsonText(e.target.value)}
+          placeholder="Paste JSON here..."
+          className="w-full h-24 rounded-lg border border-slate-200 p-3 font-mono text-xs mb-2"
+        />
+        {importError && <p className="text-xs text-red-600 mb-2">{importError}</p>}
+        <button
+          onClick={handleImportJson}
+          className="rounded bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 text-xs font-semibold"
+        >
+          Import JSON
+        </button>
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
