@@ -5,7 +5,7 @@ import { AppState, ViewType, CricketPlayer } from '@/types/index';
 
 export function useAppController() {
   const [state, setState] = useState<AppState>({
-    activeView: 'LEADERBOARD',
+    activeView: 'REWARDS',
     userRole: 'PLAYER',
     squad: {
       players: [],

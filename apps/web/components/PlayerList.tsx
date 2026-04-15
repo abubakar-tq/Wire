@@ -15,9 +15,10 @@ const ROLE_LABELS: Record<string, string> = {
 interface PlayerListProps {
   availablePlayers: CricketPlayer[];
   onSelectPlayer: (player: CricketPlayer) => void;
+  disabled?: boolean;
 }
 
-export function PlayerList({ availablePlayers, onSelectPlayer }: PlayerListProps) {
+export function PlayerList({ availablePlayers, onSelectPlayer, disabled = false }: PlayerListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
@@ -96,7 +97,8 @@ export function PlayerList({ availablePlayers, onSelectPlayer }: PlayerListProps
             <button
               key={player.id}
               onClick={() => onSelectPlayer(player)}
-              className="w-full text-left p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:shadow-sm transition-all active:scale-95"
+              disabled={disabled}
+              className="w-full text-left p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:hover:bg-white disabled:hover:shadow-none disabled:active:scale-100"
             >
               <div className="flex items-start gap-2 mb-1">
                 <Avatar className="size-9">

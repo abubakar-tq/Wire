@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowUp, ArrowDown, TrendingUp, Flame, Medal } from 'lucide-react';
+import { useAccount } from 'wagmi';
 import { AppState } from '@/types/index';
+import { addErc721ToWallet } from '@/utils/watchAsset';
+import { contractAddresses } from '@/contracts/addresses';
 
 interface LeaderboardViewProps {
   state: AppState;
@@ -12,6 +15,7 @@ interface LeaderboardViewProps {
 export function LeaderboardView({ state, onLiveUpdate }: LeaderboardViewProps) {
   const [animatingRanks, setAnimatingRanks] = useState<Set<string>>(new Set());
   const [showTop10Only, setShowTop10Only] = useState(true);
+  const [addedSquads, setAddedSquads] = useState<Set<string>>(new Set());
 
   // Simulate live updates every 2-3 seconds
   useEffect(() => {
@@ -35,8 +39,14 @@ export function LeaderboardView({ state, onLiveUpdate }: LeaderboardViewProps) {
     return () => clearTimeout(timeout);
   }, [state.livePointsTick]);
 
-  // Sort by points
-  const sortedLeaderboard = [...state.leaderboard].sort((a, b) => b.totalPoints - a.totalPoints);
+  const { address } = useAccount();
+
+  // Evaluate current user & Sort by points
+  const sortedLeaderboard = [...state.leaderboard].map((entry) => ({
+    ...entry,
+    isCurrentUser: address ? entry.userId.toLowerCase() === address.toLowerCase() : false
+  })).sort((a, b) => b.totalPoints - a.totalPoints);
+  
   const displayedLeaderboard = showTop10Only ? sortedLeaderboard.slice(0, 10) : sortedLeaderboard;
 
   const currentUserEntry = sortedLeaderboard.find((e) => e.isCurrentUser);
@@ -81,6 +91,54 @@ export function LeaderboardView({ state, onLiveUpdate }: LeaderboardViewProps) {
                   <p className="text-3xl font-bold text-[#10B981] tabular-nums">{currentUserEntry.totalPoints.toLocaleString()}</p>
                 </div>
               </div>
+              
+              {currentUserEntry.tokenIds && currentUserEntry.tokenIds.length > 0 && (
+                <div className="mt-5 pt-5 border-t border-[#10B981]/20 flex flex-col md:flex-row md:items-start gap-4">
+                  <div className="max-w-xs pr-4 text-left border-r border-[#10B981]/10">
+                    <h3 className="text-sm font-bold text-[#0F1117]">Your Squad Assets</h3>
+                    <p className="mt-1 text-xs text-[#5B6B7A] leading-relaxed">
+                      Import each of your on-chain Fantasy Squad NFTs directly into your wallet. The NFT dynamically tracks the points you scored with this specific 11-man lineup.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 flex-1">
+                    {currentUserEntry.tokenIds.map((tokenId) => {
+                      const isAdded = addedSquads.has(tokenId);
+                      return (
+                        <button
+                          key={tokenId}
+                          disabled={isAdded}
+                          onClick={async () => {
+                            try {
+                              const imgUrl = `https://api.dicebear.com/9.x/bottts-neutral/png?seed=squad-${tokenId}&backgroundColor=e5e7eb`;
+                              await addErc721ToWallet(contractAddresses.fantasyTeamNft, 'SQUAD', tokenId, imgUrl);
+                              setAddedSquads((prev) => new Set(prev).add(tokenId));
+                              setTimeout(() => {
+                                setAddedSquads((prev) => {
+                                  const next = new Set(prev);
+                                  next.delete(tokenId);
+                                  return next;
+                                });
+                              }, 5000);
+                            } catch (e) {
+                              // Optional: handle err
+                            }
+                          }}
+                          className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-xs font-bold transition-all ${
+                            isAdded
+                              ? 'bg-[#10B981] border-[#10B981] text-white shadow-md'
+                              : 'bg-white border-[#10B981]/30 text-[#059669] hover:bg-[#10B981]/10 shadow-sm'
+                          }`}
+                        >
+                          <div className={`w-6 h-6 rounded overflow-hidden shadow-sm border bg-[#10B981]/5 flex items-center justify-center p-0.5 ${isAdded ? 'border-white/30' : 'border-[#10B981]/20'}`}>
+                            <img src={`https://api.dicebear.com/9.x/bottts-neutral/svg?seed=squad-${tokenId}&backgroundColor=e5e7eb`} alt="Squad" className="w-full h-full object-contain" />
+                          </div>
+                          {isAdded ? `✓ Squad #${tokenId} Added` : `+ Add Squad #${tokenId}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

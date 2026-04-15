@@ -34,6 +34,7 @@ export interface LeaderboardEntry {
   totalPoints: number;
   change: number;
   isCurrentUser: boolean;
+  tokenIds?: string[];
 }
 
 export interface Squad {

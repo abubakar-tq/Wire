@@ -16,7 +16,7 @@ export function useLiveArenaData(selectedContestId?: string) {
   );
   const matchQuery = useMatchData(selectedContest?.matchId);
   const contestQuery = useIndexedContest(selectedContest?.contestId);
-  const leaderboardQuery = useIndexedLeaderboard(selectedContest?.contestId);
+  const globalLeaderboardQuery = useIndexedLeaderboard(undefined);
   const playerIds = useMemo(
     () => (matchQuery.data?.players ?? []).map((player) => player.playerId),
     [matchQuery.data?.players]
@@ -63,24 +63,42 @@ export function useLiveArenaData(selectedContestId?: string) {
   }, [matchQuery.data, profilesQuery.data]);
 
   const leaderboard = useMemo<LeaderboardEntry[]>(() => {
-    const rows = leaderboardQuery.data ?? [];
+    const rows = globalLeaderboardQuery.data ?? [];
     if (rows.length === 0) return [];
 
-    return rows
-      .map((row, index) => {
-        const maybeEntry = row as { user?: string; score?: number | null; tokenId?: string; rank?: number };
-        return {
-          rank: maybeEntry.rank ?? index + 1,
-          userId: maybeEntry.user ?? `entry-${index}`,
-          userName: maybeEntry.user ? `${maybeEntry.user.slice(0, 6)}...${maybeEntry.user.slice(-4)}` : `Entry ${index + 1}`,
-          squadName: maybeEntry.tokenId ? `Squad #${maybeEntry.tokenId}` : `Entry ${index + 1}`,
-          totalPoints: maybeEntry.score ?? 0,
-          change: 0,
-          isCurrentUser: false
-        };
-      })
-      .sort((a, b) => b.totalPoints - a.totalPoints);
-  }, [leaderboardQuery.data]);
+    const userMap = new Map<string, { score: number; squads: number; tokenIds: string[] }>();
+
+    for (const row of rows) {
+      const maybeEntry = row as { user?: string; score?: number | null; tokenId?: string };
+      if (!maybeEntry.user) continue;
+      
+      const existing = userMap.get(maybeEntry.user) ?? { score: 0, squads: 0, tokenIds: [] };
+      const nextTokenIds = [...existing.tokenIds];
+      if (maybeEntry.tokenId && !nextTokenIds.includes(maybeEntry.tokenId)) {
+        nextTokenIds.push(maybeEntry.tokenId);
+      }
+
+      userMap.set(maybeEntry.user, {
+        score: existing.score + (maybeEntry.score ?? 0),
+        squads: existing.squads + 1,
+        tokenIds: nextTokenIds
+      });
+    }
+
+    return Array.from(userMap.entries())
+      .map(([user, data]) => ({
+        rank: 0,
+        userId: user,
+        userName: `${user.slice(0, 6)}...${user.slice(-4)}`,
+        squadName: `${data.squads} Squad${data.squads === 1 ? '' : 's'}`,
+        tokenIds: data.tokenIds,
+        totalPoints: data.score,
+        change: 0,
+        isCurrentUser: false
+      }))
+      .sort((a, b) => b.totalPoints - a.totalPoints)
+      .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  }, [globalLeaderboardQuery.data]);
 
   return {
     selectedContest,

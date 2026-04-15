@@ -45,37 +45,6 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
     }
   };
 
-  const switchToConfiguredChain = async () => {
-    try {
-      await switchChainAsync({ chainId: configuredChainId });
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const needsAddChain =
-        message.includes("4902") ||
-        message.toLowerCase().includes("unknown chain") ||
-        message.toLowerCase().includes("unrecognized chain") ||
-        message.toLowerCase().includes("not added");
-      if (!needsAddChain || !walletClient) {
-        throw error;
-      }
-    }
-
-    await walletClient.request({
-      method: "wallet_addEthereumChain",
-      params: [{
-        chainId: `0x${configuredChainId.toString(16)}`,
-        chainName: wireFluidTestnet.name,
-        nativeCurrency: wireFluidTestnet.nativeCurrency,
-        rpcUrls: wireFluidTestnet.rpcUrls.default.http,
-        blockExplorerUrls: wireFluidTestnet.blockExplorers?.default?.url
-          ? [wireFluidTestnet.blockExplorers.default.url]
-          : undefined
-      }]
-    });
-
-    await switchChainAsync({ chainId: configuredChainId });
-  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -95,7 +64,7 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
           </button>
 
           <nav className="hidden xl:flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-            {PLAYER_VIEWS.map((item) => (
+            {!hasAdminAccess && PLAYER_VIEWS.map((item) => (
               <button
                 key={item.view}
                 onClick={() => onViewChange(item.view)}
@@ -133,33 +102,36 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
             <ConnectButton.Custom>
               {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
                 const connected = mounted && account && chain;
+                
                 if (!connected) {
                   return (
-                    <button onClick={openConnectModal} className="rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white">
+                    <button 
+                      onClick={openConnectModal} 
+                      className="rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                    >
                       Connect Wallet
+                    </button>
+                  );
+                }
+
+                if (chain.unsupported) {
+                  return (
+                    <button
+                      onClick={openChainModal}
+                      className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 shadow-sm"
+                    >
+                      Wrong Network
                     </button>
                   );
                 }
 
                 return (
                   <button
-                    onClick={async () => {
-                      if (!chain.unsupported) {
-                        openAccountModal();
-                        return;
-                      }
-                      setAuthError(null);
-                      try {
-                        await switchToConfiguredChain();
-                      } catch (error) {
-                        const fallbackMessage = `Unable to switch to chain ${configuredChainId}. Open wallet network settings and retry.`;
-                        setAuthError(error instanceof Error ? error.message : fallbackMessage);
-                        openChainModal();
-                      }
-                    }}
-                    className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+                    onClick={openAccountModal}
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 hover:shadow-sm"
                   >
-                    {chain.unsupported ? `Switch to ${configuredChainId}` : shortAddress(account.address)}
+                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    {shortAddress(account.address)}
                   </button>
                 );
               }}

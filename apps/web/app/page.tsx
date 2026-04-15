@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAccount, useChainId, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import { useAccount, useChainId, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { contestManagerAbi } from '@wirefluid/contracts';
 import { useAppController } from '@/lib/useAppController';
 import { Navbar } from '@/components/Navbar';
@@ -18,10 +18,12 @@ import { useLiveArenaData } from '@/hooks/useLiveArenaData';
 import { indexerKeys } from '@/api/useIndexerData';
 import { contractAddresses, contractsConfigured } from '@/contracts/addresses';
 import { configuredChainId } from '@/chains/wireFluidTestnet';
-import { toUint16Array11 } from '@/utils/arenaFormat';
+import { teamCodeFromBytes, toUint16Array11 } from '@/utils/arenaFormat';
 import { normalizeContractError } from '@/utils/contractErrors';
 import { useRoleChecks } from '@/web3/useRoleChecks';
 import { useSiweSession } from '@/auth/useSiweSession';
+import { useNow } from '@/hooks/useNow';
+import { formatRelativeTime } from '@/utils/liveTime';
 import type { HexString } from '@/api/indexerClient';
 import type { CricketPlayer, Squad } from '@/types/index';
 
@@ -94,10 +96,12 @@ export default function Page() {
   const auth = useSiweSession();
   const { address } = useAccount();
   const chainId = useChainId();
+  const publicClient = usePublicClient();
   const queryClient = useQueryClient();
   const { writeContractAsync, error: writeError } = useWriteContract();
   const receipt = useWaitForTransactionReceipt({ hash: txHash });
   const wrongChain = Boolean(address && chainId !== configuredChainId);
+  const now = useNow();
 
   useEffect(() => {
     if (!receipt.isSuccess) return;
@@ -107,7 +111,16 @@ export default function Page() {
     void queryClient.invalidateQueries({ queryKey: indexerKeys.user(address) });
   }, [address, live.selectedContest?.contestId, queryClient, receipt.isSuccess]);
 
+  const isAdmin = roles.admin || roles.operator || roles.scorePublisher || roles.treasury;
+
   const { state, actions } = controller;
+
+  useEffect(() => {
+    if (!isAdmin && ['ADMIN_DASHBOARD', 'PROTOCOL', 'MATCH', 'PLAYERS', 'SCORE', 'TREASURY'].includes(state.activeView)) {
+      actions.setActiveView('DASHBOARD');
+    }
+  }, [isAdmin, state.activeView, actions]);
+
   const activeMatchId = (live.selectedContest?.matchId ?? live.selectedMatch?.matchId ?? 'default').toString();
   const activeSquad = squadsByMatch[activeMatchId] ?? EMPTY_SQUAD;
 
@@ -118,7 +131,12 @@ export default function Page() {
     }));
   }, [activeMatchId]);
 
+  const lockTimeMs = live.selectedMatch?.lockTime !== undefined ? Number(live.selectedMatch.lockTime) * 1000 : null;
+  const isLockedByTime = lockTimeMs !== null ? now >= lockTimeMs : false;
+  const isLocked = live.selectedMatch?.status === 1 || isLockedByTime;
+
   const addPlayerToMatchSquad = useCallback((player: CricketPlayer) => {
+    if (isLocked) return;
     updateActiveSquad((current) => {
       if (current.players.length >= 11) return current;
       if (current.players.some((p) => p.id === player.id)) return current;
@@ -128,57 +146,68 @@ export default function Page() {
         players: [...current.players, { ...player, fantasyPoints: 0 }]
       };
     });
-  }, [updateActiveSquad]);
+  }, [isLocked, updateActiveSquad]);
 
   const removePlayerFromMatchSquad = useCallback((playerId: string) => {
+    if (isLocked) return;
     updateActiveSquad((current) => ({
       ...current,
       players: current.players.filter((p) => p.id !== playerId),
       captainId: current.captainId === playerId ? null : current.captainId,
       viceCaptainId: current.viceCaptainId === playerId ? null : current.viceCaptainId
     }));
-  }, [updateActiveSquad]);
+  }, [isLocked, updateActiveSquad]);
 
   const setMatchCaptain = useCallback((playerId: string) => {
+    if (isLocked) return;
     updateActiveSquad((current) => ({
       ...current,
       captainId: current.captainId === playerId ? null : playerId
     }));
-  }, [updateActiveSquad]);
+  }, [isLocked, updateActiveSquad]);
 
   const setMatchViceCaptain = useCallback((playerId: string) => {
+    if (isLocked) return;
     updateActiveSquad((current) => ({
       ...current,
       viceCaptainId: current.viceCaptainId === playerId ? null : playerId
     }));
-  }, [updateActiveSquad]);
+  }, [isLocked, updateActiveSquad]);
 
   const clearMatchSquad = useCallback(() => {
+    if (isLocked) return;
     setSquadsByMatch((prev) => ({
       ...prev,
       [activeMatchId]: EMPTY_SQUAD
     }));
-  }, [activeMatchId]);
+  }, [activeMatchId, isLocked]);
 
   const squadValidationError = getSquadValidationError(activeSquad);
   const isMatchSquadValid = squadValidationError === null;
   const squadComposition = getSquadComposition(activeSquad);
 
-  const isAdmin = roles.admin || roles.operator || roles.scorePublisher || roles.treasury || auth.authenticated;
   const effectiveState = {
     ...state,
     userRole: isAdmin ? 'ADMIN' as const : 'PLAYER' as const,
     squad: activeSquad,
     leaderboard: live.leaderboard,
     matchStatus:
-      live.selectedMatch?.status === 1
+      isLocked
         ? 'LOCKED' as const
         : live.selectedMatch?.status === 3
           ? 'FINALIZED' as const
           : state.matchStatus
   };
   const selectedIds = new Set(activeSquad.players.map((player) => player.id));
-  const availablePlayers = live.availablePlayers.filter((player) => !selectedIds.has(player.id));
+  const availablePlayers = live.availablePlayers.filter((player) => {
+    if (selectedIds.has(player.id)) return false;
+    if (live.selectedMatch) {
+      const matchHome = teamCodeFromBytes(live.selectedMatch.homeTeam, 'HOME');
+      const matchAway = teamCodeFromBytes(live.selectedMatch.awayTeam, 'AWAY');
+      if (player.team !== matchHome && player.team !== matchAway) return false;
+    }
+    return true;
+  });
 
   const joinContest = async () => {
     setJoinError(undefined);
@@ -191,6 +220,18 @@ export default function Page() {
     if (chainId !== configuredChainId) {
       setJoinError(`Switch to chain ${configuredChainId}`);
       throw new Error(`Switch to chain ${configuredChainId}`);
+    }
+    if (!publicClient) {
+      setJoinError('Wallet RPC is not available.');
+      throw new Error('Wallet RPC is not available.');
+    }
+
+    const contestManagerCode = await publicClient.getBytecode({ address: contractAddresses.contestManager });
+    if (!contestManagerCode || contestManagerCode === '0x') {
+      setJoinError(
+        'ContestManager address has no contract code on your connected network. You are likely connected to the real testnet RPC while using fork/local addresses. Switch your wallet RPC to the fork (http://127.0.0.1:8545) or set correct testnet contract addresses.'
+      );
+      throw new Error('ContestManager address has no contract code.');
     }
 
     const playerIds = toUint16Array11(activeSquad.players.map((player) => player.chainPlayerId ?? Number(player.id)));
@@ -243,7 +284,7 @@ export default function Page() {
             activeMatchId={activeMatchId}
             activeMatchLabel={
               live.selectedMatch
-                ? `${live.selectedMatch.matchId}`
+                ? `${live.selectedMatch.matchId} (lock ${formatRelativeTime(live.selectedMatch.lockTime, now)})`
                 : live.selectedContest
                   ? `${live.selectedContest.matchId}`
                   : undefined

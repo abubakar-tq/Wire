@@ -9,6 +9,7 @@ import { useArenaWriter } from '@/web3/useArenaWriter';
 import { formatWire } from '@/utils/arenaFormat';
 import { getClaimActionState } from '@/utils/actionStates';
 import { getPassportLevel } from '@/utils/passportLevel';
+import { addErc721ToWallet } from '@/utils/watchAsset';
 
 interface RewardsViewProps {
   wireBalance: number;
@@ -17,6 +18,7 @@ interface RewardsViewProps {
 
 export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [hasAddedToWallet, setHasAddedToWallet] = useState(false);
   const passport = useCurrentUserPassport();
   const writer = useArenaWriter();
 
@@ -69,13 +71,47 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
                 <h2 className="mt-3 text-2xl font-bold text-slate-900">
                   {profile ? `Passport #${profile.tokenId}` : 'No Passport Minted Yet'}
                 </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  {profile ? 'This identity persists with your wallet and keeps growing each contest.' : 'Join your first contest to mint and start building this profile.'}
-                </p>
-              </div>
-
-              <div className="w-20 h-20 rounded-2xl bg-slate-900 text-white flex items-center justify-center">
-                <Award className="w-8 h-8" />
+                <div className="mt-6 flex flex-col sm:flex-row sm:items-start gap-4 p-4 rounded-xl border border-slate-200 bg-white shadow-sm relative overflow-hidden">
+                  <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden bg-[#10B981]/10 shadow-sm border border-[#10B981]/20 flex items-center justify-center">
+                    <img 
+                      src={`https://api.dicebear.com/9.x/bottts-neutral/svg?seed=passport-${profile?.tokenId ?? '0'}&backgroundColor=e5e7eb`} 
+                      alt="Passport Artwork"
+                      className="w-16 h-16 object-contain"
+                    />
+                  </div>
+                  <div className="flex-1 relative z-10">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Award className="w-4 h-4 text-emerald-500" /> Digital Identity Protocol
+                    </h3>
+                    <p className="mt-2 text-xs text-slate-500 leading-relaxed max-w-sm">
+                      This token serves as your on-chain fantasy arena reputation. It intrinsically binds your XP, completed brackets, and total rewards distributed across the decentralized indexer perfectly into MetaMask.
+                    </p>
+                    
+                    {profile && (
+                      <button
+                        disabled={hasAddedToWallet}
+                        onClick={async () => {
+                          try {
+                            const imgUrl = `https://api.dicebear.com/9.x/bottts-neutral/png?seed=passport-${profile.tokenId}&backgroundColor=e5e7eb`;
+                            await addErc721ToWallet(contractAddresses.legacyPassport, 'PASSPORT', profile.tokenId, imgUrl);
+                            setHasAddedToWallet(true);
+                            setTimeout(() => setHasAddedToWallet(false), 5000);
+                          } catch (e) {
+                            const err = e as Error;
+                            setStatusMessage(`Failed to import to wallet: ${err.message || String(err)}`);
+                          }
+                        }}
+                        className={`mt-4 inline-flex items-center justify-center rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                          hasAddedToWallet 
+                            ? 'bg-emerald-100 text-emerald-700 pointer-events-none' 
+                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'
+                        }`}
+                      >
+                        {hasAddedToWallet ? '✓ Added to MetaMask' : '+ Import to MetaMask'}
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -139,16 +175,7 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
             {refundClaimState.reason ? <p className="mt-2 text-xs text-slate-500">{refundClaimState.reason}</p> : null}
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wide">
-              <ShieldCheck className="w-4 h-4" />
-              Balance Context
-            </div>
-            <p className="mt-3 text-sm text-slate-600">
-              Claim states are indexed and then settled by on-chain contract calls. Keep Anvil and indexer running for accurate local values.
-            </p>
-            <p className="mt-3 text-xs text-slate-500">UI wallet balance: {wireBalance.toLocaleString()} WIRE</p>
-          </div>
+
         </section>
 
         {(statusMessage || writer.error) && (

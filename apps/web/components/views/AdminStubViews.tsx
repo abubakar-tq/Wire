@@ -79,22 +79,19 @@ export function ProtocolView() {
   const [squadBaseUri, setSquadBaseUri] = useState('');
   const [passportBaseUri, setPassportBaseUri] = useState('');
   const [appOrigin, setAppOrigin] = useState('');
-  const [metadataDefaultsApplied, setMetadataDefaultsApplied] = useState(false);
-  const recommendedSquadBaseUri = appOrigin ? `${appOrigin}/api/nft/squad/` : '';
-  const recommendedPassportBaseUri = appOrigin ? `${appOrigin}/api/nft/passport/` : '';
-  const squadTokenPreview = squadBaseUri ? `${squadBaseUri}1` : 'Set a base URI to preview token #1';
-  const passportTokenPreview = passportBaseUri ? `${passportBaseUri}1` : 'Set a base URI to preview token #1';
+  const envSquadUri = process.env.NEXT_PUBLIC_SQUAD_BASE_URI ?? '';
+  const envPassportUri = process.env.NEXT_PUBLIC_PASSPORT_BASE_URI ?? '';
+  
+  const defaultSquadUri = envSquadUri || (appOrigin ? `${appOrigin}/api/nft/squad/` : '');
+  const defaultPassportUri = envPassportUri || (appOrigin ? `${appOrigin}/api/nft/passport/` : '');
+  
+  const squadTokenPreview = defaultSquadUri ? `${defaultSquadUri}1` : 'Not configured';
+  const passportTokenPreview = defaultPassportUri ? `${defaultPassportUri}1` : 'Not configured';
 
   useEffect(() => {
     setAppOrigin(window.location.origin);
   }, []);
 
-  useEffect(() => {
-    if (metadataDefaultsApplied || !recommendedSquadBaseUri || !recommendedPassportBaseUri) return;
-    setSquadBaseUri(recommendedSquadBaseUri);
-    setPassportBaseUri(recommendedPassportBaseUri);
-    setMetadataDefaultsApplied(true);
-  }, [metadataDefaultsApplied, recommendedPassportBaseUri, recommendedSquadBaseUri]);
 
   const contracts = [
     ['MatchRegistry', contractAddresses.matchRegistry],
@@ -153,37 +150,45 @@ export function ProtocolView() {
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="font-bold text-slate-900 mb-4">NFT Metadata</h2>
-          <div className="space-y-3">
+          <h2 className="font-bold text-slate-900 mb-4">Initialize Token URIs</h2>
+          <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Use the app metadata endpoint as the on-chain base URI. The Pinata sync writes metadata to IPFS, then these routes redirect wallets to the synced JSON.
+              Configure Token URIs across the protocol. Defaults are picked up from the <code>.env.local</code> namespace (e.g. Pinata Gateways or internal Routes).
             </p>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-              <p className="font-semibold text-slate-900">Recommended squad URI</p>
-              <p className="mt-1 break-all">{recommendedSquadBaseUri || 'Loading app origin...'}</p>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 space-y-3">
+              <div>
+                <p className="font-semibold text-slate-900">Target Squad URI</p>
+                <p className="mt-1 break-all bg-white py-1 px-2 border border-slate-200 rounded">{defaultSquadUri || 'Waiting for config...'}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900">Target Passport URI</p>
+                <p className="mt-1 break-all bg-white py-1 px-2 border border-slate-200 rounded">{defaultPassportUri || 'Waiting for config...'}</p>
+              </div>
             </div>
-            <input value={squadBaseUri} onChange={(event) => setSquadBaseUri(event.target.value)} placeholder="FantasyTeamNFT base URI" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-            <p className="break-all text-xs text-slate-500">Token #1 preview: {squadTokenPreview}</p>
+            
             <button
-              onClick={() => writer.write({ address: contractAddresses.fantasyTeamNft, abi: fantasyTeamNftAbi, functionName: 'setBaseURI', args: [squadBaseUri] })}
-              disabled={!squadBaseUri || writer.isBusy}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              onClick={() => {
+                if (defaultSquadUri) {
+                  writer.write({ address: contractAddresses.fantasyTeamNft, abi: fantasyTeamNftAbi, functionName: 'setBaseURI', args: [defaultSquadUri] });
+                }
+              }}
+              disabled={!defaultSquadUri || writer.isBusy}
+              className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              Set Squad Base URI
+              Sync Squad URI
             </button>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-              <p className="font-semibold text-slate-900">Recommended passport URI</p>
-              <p className="mt-1 break-all">{recommendedPassportBaseUri || 'Loading app origin...'}</p>
-            </div>
-            <input value={passportBaseUri} onChange={(event) => setPassportBaseUri(event.target.value)} placeholder="LegacyPassport base URI" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-            <p className="break-all text-xs text-slate-500">Token #1 preview: {passportTokenPreview}</p>
             <button
-              onClick={() => writer.write({ address: contractAddresses.legacyPassport, abi: legacyPassportAbi, functionName: 'setBaseURI', args: [passportBaseUri] })}
-              disabled={!passportBaseUri || writer.isBusy}
+              onClick={() => {
+                if (defaultPassportUri) {
+                  writer.write({ address: contractAddresses.legacyPassport, abi: legacyPassportAbi, functionName: 'setBaseURI', args: [defaultPassportUri] });
+                }
+              }}
+              disabled={!defaultPassportUri || writer.isBusy}
               className="w-full rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              Set Passport Base URI
+              Sync Passport URI
             </button>
+            
             {writer.hash && <p className="break-all text-xs text-slate-500">Tx: {writer.hash}</p>}
             {writer.error && <p className="text-xs text-red-600">{writer.error}</p>}
           </div>
@@ -191,17 +196,13 @@ export function ProtocolView() {
       </div>
 
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
-        <h2 className="font-bold text-slate-900 mb-3">Local Admin Guide</h2>
+        <h2 className="font-bold text-slate-900 mb-3">Protocol Health</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-700">
           {[
-            'Start Anvil with chain ID 31337.',
-            'Deploy contracts and seed demo data from the contracts workspace.',
-            'Connect wallet 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266.',
-            'Switch the wallet network to chain 31337.',
-            'The Admin button appears when on-chain roles are detected.',
-            'Click Admin and verify the wallet signature.',
-            'Use Match to create matches, set player pools, and create contests.',
-            'Use Score and Treasury to submit stats, finalize contests, and manage payouts.'
+            'Deploy core smart contracts to the WireFluid Testnet or Local environment.',
+            'Seed blockchain configurations through forge scripts.',
+            'Maintain the Ponder indexer synchronously processing chain state blocks.',
+            'Utilize this administrative module to mint token assets globally.'
           ].map((step, index) => (
             <div key={step} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
               <span className="font-semibold text-slate-900">{index + 1}.</span> {step}
@@ -1135,13 +1136,28 @@ export function PlayerDatabaseView() {
               Active player
             </label>
           </div>
-          <button
-            onClick={saveSinglePlayer}
-            disabled={saving}
-            className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            Save Player
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={saveSinglePlayer}
+              disabled={saving}
+              className="mt-4 flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              Save Player
+            </button>
+            {form.playerId && usedIds.has(Number(form.playerId)) && (
+              <button
+                onClick={() => {
+                  if (confirm('Are you sure you want to delete this player from the database?')) {
+                    void handleDeletePlayer();
+                  }
+                }}
+                disabled={saving}
+                className="mt-4 rounded-lg bg-red-100 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50"
+              >
+                Delete
+              </button>
+            )}
+          </div>
         </section>
 
         <section className="rounded-lg border border-slate-200 p-5">

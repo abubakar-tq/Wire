@@ -60,6 +60,7 @@ export function ArenaView({
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showPlayersOnMobile, setShowPlayersOnMobile] = useState(false);
+  const isLocked = matchStatus === 'LOCKED';
 
   const captain = squad.players.find((player) => player.id === squad.captainId) ?? null;
   const viceCaptain = squad.players.find((player) => player.id === squad.viceCaptainId) ?? null;
@@ -85,11 +86,11 @@ export function ArenaView({
   return (
     <div className="flex-1 grid grid-cols-1 xl:grid-cols-[18rem_minmax(0,1fr)] h-[calc(100vh-73px)] bg-white">
       <aside className="hidden xl:block border-r border-slate-200 overflow-y-auto">
-        <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} />
+        <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} disabled={isLocked} />
       </aside>
 
       <section className="overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 space-y-4">
+        <div className="w-full mx-auto px-4 md:px-8 py-6 space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white p-5 md:p-6">
             <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
               <div>
@@ -119,7 +120,7 @@ export function ArenaView({
 
           {showPlayersOnMobile ? (
             <div className="xl:hidden rounded-xl border border-slate-200 overflow-hidden">
-              <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} />
+              <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} disabled={isLocked} />
             </div>
           ) : null}
 
@@ -139,15 +140,15 @@ export function ArenaView({
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Contest Info Header / Horizontal bar */}
-            <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div>
+            <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+              <div className="min-w-0 flex items-start gap-4">
+                <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected Contest</p>
                   {openContests.length > 0 && onChangeContest ? (
                     <select
                       value={selectedContest?.contestId ?? ''}
                       onChange={(e) => onChangeContest(e.target.value)}
-                      className="mt-1 block w-full md:w-64 rounded-md border-slate-300 py-1.5 pl-3 pr-10 text-base font-bold text-slate-900 border"
+                      className="mt-1 block w-full sm:w-72 rounded-md border-slate-300 py-1.5 pl-3 pr-10 text-base font-bold text-slate-900 border"
                     >
                       <option value="" disabled>Select a contest</option>
                       {openContests.map((c) => (
@@ -159,21 +160,15 @@ export function ArenaView({
                   ) : (
                     <p className="text-lg font-bold text-slate-900">{selectedContest ? `#${selectedContest.contestId}` : 'No Open Contest'}</p>
                   )}
+                  {selectedContest ? (
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-700">
+                      <span className="rounded bg-slate-100 px-2 py-1">Entry fee {formatWire(selectedContest.entryFee)}</span>
+                      <span className="rounded bg-slate-100 px-2 py-1">Entries {selectedContest.totalEntries}/{selectedContest.maxEntries}</span>
+                    </div>
+                  ) : null}
                 </div>
-                {selectedContest && (
-                  <div className="hidden md:flex gap-4 border-l border-slate-200 pl-4">
-                    <div>
-                      <p className="text-[11px] font-semibold text-slate-500 uppercase">Entry Fee</p>
-                      <p className="font-semibold text-slate-900">{formatWire(selectedContest.entryFee)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold text-slate-500 uppercase">Entries</p>
-                      <p className="font-semibold text-slate-900">{selectedContest.totalEntries}/{selectedContest.maxEntries}</p>
-                    </div>
-                  </div>
-                )}
               </div>
-              <div className="flex flex-col items-end gap-2 shrink-0">
+              <div className="flex flex-col items-end gap-2 w-full xl:w-auto">
                 <button
                   onClick={openConfirm}
                   disabled={!isSquadValid || matchStatus === 'LOCKED' || !selectedContest || isJoining}
@@ -216,7 +211,7 @@ export function ArenaView({
                   </div>
                   <button
                     onClick={onClearSquad}
-                    disabled={squad.players.length === 0}
+                    disabled={isLocked || squad.players.length === 0}
                     className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                   >
                     Clear

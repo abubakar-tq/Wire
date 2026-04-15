@@ -27,7 +27,7 @@ export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
 
   return (
     <div className="flex-1 overflow-y-auto h-[calc(100vh-73px)] bg-white">
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6">
+      <div className="w-full mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6">
         <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">WireFluid Fantasy Arena</p>
@@ -56,6 +56,7 @@ export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
               {openContests.map((contest) => {
                 const match = (matches.data ?? []).find((item) => item.matchId === contest.matchId);
                 const lockLabel = match ? `lock ${formatRelativeTime(match.lockTime, now)}` : null;
+                const isLocked = match ? match.status === 1 || Number(match.lockTime) * 1000 <= now : false;
                 return (
                   <div key={contest.id} className="p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0">
@@ -76,7 +77,9 @@ export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
                     </div>
                     <button
                       onClick={() => onBuildSquad(contest.contestId)}
-                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                      disabled={isLocked}
+                      title={isLocked ? "Match is locked." : undefined}
+                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-slate-900"
                     >
                       Build Squad
                     </button>
