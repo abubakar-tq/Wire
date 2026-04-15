@@ -10,22 +10,20 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'WireFluid Arena - Web3 Fantasy Sports',
   description: 'Build your dream squad, mint NFTs, and compete in the ultimate fantasy sports platform',
-  generator: 'v0.app',
   icons: {
     icon: [
       {
         url: '/icon-light-32x32.png',
         media: '(prefers-color-scheme: light)',
+        sizes: '32x32',
       },
       {
         url: '/icon-dark-32x32.png',
         media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        sizes: '32x32',
       },
     ],
+    shortcut: ['/icon-light-32x32.png'],
     apple: '/apple-icon.png',
   },
 }
