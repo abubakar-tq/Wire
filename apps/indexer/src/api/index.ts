@@ -22,12 +22,24 @@ import { getAddress, isAddress } from "viem";
 
 const app = new Hono();
 
-app.get("/healthz", (c) =>
-  json(c, {
+app.get("/healthz", health);
+
+async function health(c: Context) {
+  const [latestEvent] = await db.select().from(auditEvents).orderBy(desc(auditEvents.blockNumber)).limit(1);
+  return json(c, {
     ok: true,
-    service: "wirefluid-indexer"
-  })
-);
+    service: "wirefluid-indexer",
+    latestBlock: latestEvent?.blockNumber ?? null,
+    latestEvent: latestEvent
+      ? {
+          contractName: latestEvent.contractName,
+          eventName: latestEvent.eventName,
+          blockNumber: latestEvent.blockNumber,
+          transactionHash: latestEvent.transactionHash
+        }
+      : null
+  });
+}
 
 app.get("/summary", async (c) => {
   const [recentMatches, recentContests, treasury, recentClaims, metadata] = await Promise.all([

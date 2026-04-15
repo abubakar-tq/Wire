@@ -10,6 +10,7 @@ import {
   getAuditEvents,
   getContest,
   getContests,
+  getIndexerHealth,
   getIndexerSummary,
   getLeaderboard,
   getMatch,
@@ -21,6 +22,7 @@ import {
 } from "./indexerClient";
 
 export const indexerKeys = {
+  health: ["indexer", "health"] as const,
   summary: ["indexer", "summary"] as const,
   matches: ["indexer", "matches"] as const,
   match: (matchId: string | bigint | null | undefined) => ["indexer", "match", matchId?.toString()] as const,
@@ -32,11 +34,20 @@ export const indexerKeys = {
   auditEvents: ["indexer", "audit-events"] as const
 };
 
+export function useIndexerHealth() {
+  return useQuery({
+    queryKey: indexerKeys.health,
+    queryFn: () => getIndexerHealth({ cache: "no-store" }),
+    refetchInterval: 5_000,
+    retry: 1
+  });
+}
+
 export function useIndexerSummary() {
   return useQuery({
     queryKey: indexerKeys.summary,
     queryFn: () => getIndexerSummary({ cache: "no-store" }),
-    refetchInterval: 10_000
+    refetchInterval: 3_000
   });
 }
 
@@ -44,7 +55,7 @@ export function useIndexedMatches() {
   return useQuery({
     queryKey: indexerKeys.matches,
     queryFn: () => getMatches({ cache: "no-store" }),
-    refetchInterval: 10_000
+    refetchInterval: 3_000
   });
 }
 
@@ -153,7 +164,7 @@ export function useIndexedContests() {
   return useQuery({
     queryKey: indexerKeys.contests,
     queryFn: () => getContests({ cache: "no-store" }),
-    refetchInterval: 10_000
+    refetchInterval: 3_000
   });
 }
 
@@ -162,7 +173,7 @@ export function useIndexedContest(contestId: string | bigint | null | undefined)
     queryKey: indexerKeys.contest(contestId),
     queryFn: () => getContest(contestId ?? "0", { cache: "no-store" }),
     enabled: Boolean(contestId),
-    refetchInterval: 10_000
+    refetchInterval: 3_000
   });
 }
 
@@ -170,7 +181,7 @@ export function useIndexedLeaderboard(contestId: string | bigint | null | undefi
   return useQuery({
     queryKey: indexerKeys.leaderboard(contestId),
     queryFn: () => getLeaderboard(contestId ?? undefined, { cache: "no-store" }),
-    refetchInterval: 10_000
+    refetchInterval: 3_000
   });
 }
 

@@ -123,6 +123,18 @@ export type IndexerSummary = {
   metadata?: unknown[];
 };
 
+export type IndexerHealth = {
+  ok: boolean;
+  service: string;
+  latestBlock: string | null;
+  latestEvent: {
+    contractName: string;
+    eventName: string;
+    blockNumber: string;
+    transactionHash: HexString;
+  } | null;
+};
+
 export async function indexerGraphql<TData>(
   query: string,
   variables?: Record<string, unknown>,
@@ -156,6 +168,10 @@ export async function indexerGraphql<TData>(
 
 export async function getIndexerSummary(init?: RequestInit): Promise<IndexerSummary> {
   return getIndexerJson<IndexerSummary>("/summary", init);
+}
+
+export async function getIndexerHealth(init?: RequestInit): Promise<IndexerHealth> {
+  return getIndexerJson<IndexerHealth>("/healthz", init);
 }
 
 export async function getMatches(init?: RequestInit): Promise<IndexedMatch[]> {
