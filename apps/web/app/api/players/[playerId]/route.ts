@@ -4,8 +4,13 @@ import { deletePlayer, getPlayer, playerProfileInputSchema, upsertPlayers } from
 
 export const runtime = "nodejs";
 
-export async function GET(_request: NextRequest, context: { params: { playerId: string } }) {
-	const playerId = Number(context.params.playerId);
+type PlayerRouteContext = {
+	params: Promise<{ playerId: string }>;
+};
+
+export async function GET(_request: NextRequest, context: PlayerRouteContext) {
+	const params = await context.params;
+	const playerId = Number(params.playerId);
 	if (!Number.isInteger(playerId) || playerId <= 0) {
 		return NextResponse.json({ error: "Invalid playerId" }, { status: 400 });
 	}
@@ -18,7 +23,7 @@ export async function GET(_request: NextRequest, context: { params: { playerId: 
 	return NextResponse.json({ player });
 }
 
-export async function PUT(request: NextRequest, context: { params: { playerId: string } }) {
+export async function PUT(request: NextRequest, context: PlayerRouteContext) {
 	const session = readSessionCookie(request);
 	if (!session) {
 		return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -27,7 +32,8 @@ export async function PUT(request: NextRequest, context: { params: { playerId: s
 		return NextResponse.json({ error: "Admin role required" }, { status: 403 });
 	}
 
-	const playerId = Number(context.params.playerId);
+	const params = await context.params;
+	const playerId = Number(params.playerId);
 	if (!Number.isInteger(playerId) || playerId <= 0) {
 		return NextResponse.json({ error: "Invalid playerId" }, { status: 400 });
 	}
@@ -56,7 +62,7 @@ export async function PUT(request: NextRequest, context: { params: { playerId: s
 	}
 }
 
-export async function DELETE(request: NextRequest, context: { params: { playerId: string } }) {
+export async function DELETE(request: NextRequest, context: PlayerRouteContext) {
 	const session = readSessionCookie(request);
 	if (!session) {
 		return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -65,7 +71,8 @@ export async function DELETE(request: NextRequest, context: { params: { playerId
 		return NextResponse.json({ error: "Admin role required" }, { status: 403 });
 	}
 
-	const playerId = Number(context.params.playerId);
+	const params = await context.params;
+	const playerId = Number(params.playerId);
 	if (!Number.isInteger(playerId) || playerId <= 0) {
 		return NextResponse.json({ error: "Invalid playerId" }, { status: 400 });
 	}

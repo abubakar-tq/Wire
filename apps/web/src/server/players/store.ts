@@ -21,7 +21,12 @@ export const playerProfileInputSchema = z.object({
   name: z.string().min(1),
   teamCode: z.string().min(1).max(12).optional().nullable(),
   role: z.enum(["WK", "BAT", "AR", "BOWL"]).optional().nullable(),
-  imageUrl: z.string().url().optional().nullable(),
+  imageUrl: z
+    .string()
+    .min(1)
+    .refine((value) => value.startsWith("/") || isValidUrl(value), "Image must be an absolute URL or a public asset path")
+    .optional()
+    .nullable(),
   active: z.boolean().optional(),
   metadata: z.record(z.unknown()).optional()
 });
@@ -121,4 +126,13 @@ function fallbackPlayers(ids?: number[]): PlayerProfile[] {
     createdAt: now,
     updatedAt: now
   }));
+}
+
+function isValidUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
