@@ -3,6 +3,8 @@ import { getDb } from "@/server/db";
 import { nftMetadata } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * @route GET /api/nft/squad/[tokenId]
  * @description Decentralized metadata resolution API for Wirefluid Squads.
