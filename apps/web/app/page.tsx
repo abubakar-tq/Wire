@@ -14,6 +14,9 @@ import { AdminScoreView } from '@/components/views/AdminScoreView';
 import { AdminDashboardView } from '@/components/views/AdminDashboardView';
 import { DashboardView } from '@/components/views/DashboardView';
 import { ProtocolView, MatchView, PlayerDatabaseView, TreasuryView } from '@/components/views/AdminStubViews';
+import { ChatButton } from '@/components/chat/ChatButton';
+import { ChatPanel } from '@/components/chat/ChatPanel';
+import { useChatBot } from '@/components/chat/useChatBot';
 import { useLiveArenaData } from '@/hooks/useLiveArenaData';
 import { indexerKeys } from '@/api/useIndexerData';
 import { contractAddresses, contractsConfigured } from '@/contracts/addresses';
@@ -114,6 +117,7 @@ export default function Page() {
   const isAdmin = roles.admin || roles.operator || roles.scorePublisher || roles.treasury;
 
   const { state, actions } = controller;
+  const chat = useChatBot(state.activeView);
 
   useEffect(() => {
     if (!isAdmin && ['ADMIN_DASHBOARD', 'PROTOCOL', 'MATCH', 'PLAYERS', 'SCORE', 'TREASURY'].includes(state.activeView)) {
@@ -356,6 +360,16 @@ export default function Page() {
           {renderView()}
         </div>
       </div>
+
+      {/* WireGuide AI Chatbot Portal Roots */}
+      <ChatButton isOpen={chat.isOpen} toggle={chat.toggleOpen} />
+      <ChatPanel 
+        isOpen={chat.isOpen} 
+        messages={chat.messages} 
+        isLoading={chat.isLoading} 
+        sendMessage={chat.sendMessage}
+        clearChat={chat.clearChat} 
+      />
 
       {/* Global Styles for Animations */}
       <style jsx global>{`
