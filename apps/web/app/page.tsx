@@ -201,6 +201,8 @@ export default function Page() {
                   ? `${live.selectedContest.matchId}`
                   : undefined
             }
+            openContests={(live.contests ?? []).filter(c => !c.finalized && !c.cancelled)}
+            onChangeContest={(id: string) => setSelectedContestId(id)}
             selectedContest={live.selectedContest}
             onJoinContest={joinContest}
             isJoining={writeStatus === 'pending' || receipt.status === 'pending'}

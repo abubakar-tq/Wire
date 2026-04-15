@@ -22,6 +22,8 @@ interface ArenaViewProps {
   onSetCaptain: (playerId: string) => void;
   onSetViceCaptain: (playerId: string) => void;
   onClearSquad?: () => void;
+  openContests?: IndexedContest[];
+  onChangeContest?: (contestId: string) => void;
   selectedContest?: IndexedContest | null;
   onJoinContest?: () => Promise<void>;
   isJoining?: boolean;
@@ -42,6 +44,8 @@ export function ArenaView({
   onSetCaptain,
   onSetViceCaptain,
   onClearSquad,
+  openContests = [],
+  onChangeContest,
   selectedContest,
   onJoinContest,
   isJoining = false,
@@ -76,7 +80,7 @@ export function ArenaView({
   };
 
   return (
-    <div className="flex-1 grid grid-cols-1 xl:grid-cols-[22rem_minmax(0,1fr)] h-[calc(100vh-73px)] bg-white">
+    <div className="flex-1 grid grid-cols-1 xl:grid-cols-[18rem_minmax(0,1fr)] h-[calc(100vh-73px)] bg-white">
       <aside className="hidden xl:block border-r border-slate-200 overflow-y-auto">
         <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} creditsUsed={creditsUsed} />
       </aside>
@@ -131,8 +135,60 @@ export function ArenaView({
             </div>
           ) : null}
 
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-5">
-            <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Contest Info Header / Horizontal bar */}
+            <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected Contest</p>
+                  {openContests.length > 0 && onChangeContest ? (
+                    <select
+                      value={selectedContest?.contestId ?? ''}
+                      onChange={(e) => onChangeContest(e.target.value)}
+                      className="mt-1 block w-full md:w-64 rounded-md border-slate-300 py-1.5 pl-3 pr-10 text-base font-bold text-slate-900 border"
+                    >
+                      <option value="" disabled>Select a contest</option>
+                      {openContests.map((c) => (
+                        <option key={c.contestId} value={c.contestId}>
+                          Contest #{c.contestId} — {formatWire(c.entryFee)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-lg font-bold text-slate-900">{selectedContest ? `#${selectedContest.contestId}` : 'No Open Contest'}</p>
+                  )}
+                </div>
+                {selectedContest && (
+                  <div className="hidden md:flex gap-4 border-l border-slate-200 pl-4">
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-500 uppercase">Entry Fee</p>
+                      <p className="font-semibold text-slate-900">{formatWire(selectedContest.entryFee)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-500 uppercase">Entries</p>
+                      <p className="font-semibold text-slate-900">{selectedContest.totalEntries}/{selectedContest.maxEntries}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <button
+                  onClick={openConfirm}
+                  disabled={!isSquadValid || matchStatus === 'LOCKED' || !selectedContest || isJoining}
+                  className={`rounded-lg px-6 py-2.5 font-bold text-white shadow-sm w-full md:w-auto ${
+                    isSquadValid && matchStatus !== 'LOCKED' && selectedContest && !isJoining
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-slate-300 cursor-not-allowed'
+                  }`}
+                >
+                  {isJoining ? 'Joining...' : 'Review And Join'}
+                </button>
+                {txHash ? <p className="text-[10px] text-emerald-600 font-semibold break-all max-w-xs text-right">Tx: {txHash}</p> : null}
+                {txError ? <p className="text-xs text-red-600 font-semibold max-w-xs text-right">{txError}</p> : null}
+              </div>
+            </div>
+
+            <div className="lg:col-span-3 space-y-4">
               <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
                 <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
                   <div>
@@ -192,39 +248,13 @@ export function ArenaView({
               </div>
 
               {squad.players.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                  <Plus className="w-6 h-6 mx-auto mb-2 text-slate-400" />
-                  <p className="font-semibold text-slate-700">No players selected for this match</p>
-                  <p className="text-sm text-slate-500">Open the player panel and add your first pick.</p>
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center min-h-[400px] flex flex-col items-center justify-center">
+                  <Plus className="w-8 h-8 mb-3 text-slate-400" />
+                  <p className="font-semibold text-slate-700 text-lg">No players selected for this match</p>
+                  <p className="text-sm text-slate-500 mt-1">Open the player panel and add your first pick to build your squad.</p>
                 </div>
               ) : null}
             </div>
-
-            <aside className="space-y-4">
-              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 text-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Contest</p>
-                <p className="text-lg font-bold text-slate-900">{selectedContest ? `#${selectedContest.contestId}` : 'No Open Contest'}</p>
-                <DataRow label="Match" value={selectedContest ? `#${selectedContest.matchId}` : '—'} />
-                <DataRow label="Entry fee" value={selectedContest ? formatWire(selectedContest.entryFee) : '—'} />
-                <DataRow label="Entries" value={selectedContest ? `${selectedContest.totalEntries}/${selectedContest.maxEntries}` : '—'} />
-                <DataRow label="Credits left" value={`${creditsAvailable}`} />
-              </div>
-
-              <button
-                onClick={openConfirm}
-                disabled={!isSquadValid || matchStatus === 'LOCKED' || !selectedContest || isJoining}
-                className={`w-full rounded-xl px-4 py-3 font-semibold text-white ${
-                  isSquadValid && matchStatus !== 'LOCKED' && selectedContest && !isJoining
-                    ? 'bg-slate-900 hover:bg-slate-800'
-                    : 'bg-slate-300 cursor-not-allowed'
-                }`}
-              >
-                {isJoining ? 'Joining Contest...' : 'Review And Join'}
-              </button>
-
-              {txHash ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 break-all">Tx: {txHash}</div> : null}
-              {txError ? <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{txError}</div> : null}
-            </aside>
           </div>
         </div>
       </section>
