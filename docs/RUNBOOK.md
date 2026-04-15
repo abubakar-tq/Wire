@@ -75,6 +75,21 @@ Start the indexer from the repo root:
 pnpm dev:indexer
 ```
 
+Check indexer health:
+
+```text
+http://localhost:42069/health
+```
+
+If transactions confirm on Anvil but new matches, player pools, or contests do not appear in the UI:
+
+- Make sure `apps/indexer/.env.local` has `DATABASE_URL` and `WIREFLUID_CHAIN_ID=31337`.
+- Restart the indexer after changing contract addresses, chain ID, RPC URL, or database URL.
+- If Anvil was restarted from a clean chain, also restart Ponder against a clean local indexer database. Ponder event history must match the current Anvil chain history.
+- Keep `PONDER_START_BLOCK=0` locally. On WireFluid Testnet, set it to the deployment block.
+
+If Anvil logs repeated calls to `0x95d89b41`, `0x313ce567`, or `0x70a08231` against `0x5Fb...`, those are ERC-20 metadata/balance probes for `name()`, `decimals()`, and `balanceOf(address)`. The WireFluid app does not make those calls against `MatchRegistry`. They usually come from a wallet/provider after the local address was imported as a token on chain `31337`. Remove that imported token/account asset from the wallet for the local network, then reconnect.
+
 Start the web app from the repo root:
 
 ```bash
