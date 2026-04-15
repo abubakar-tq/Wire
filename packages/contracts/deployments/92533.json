@@ -1,13 +1,13 @@
 {
   "chainId": 92533,
   "contracts": {
-    "contestManager": "0xbf7cF0b455D9a7d65dc17FaeAD8B76bB41de9e61",
-    "fantasyTeamNft": "0xe0B9d30c5E7BED77C45f576F062fdBFB73af4f04",
-    "legacyPassport": "0x76c8eD839e8dff857097b8ffe7d71423DD2A8593",
-    "matchRegistry": "0x74FA1f4d7866f801eF3b24c574d629CcEA4F7aC2",
-    "scoreManager": "0x1D8E1aD6bc470914adef8BA00F4e1282fE439E56"
+    "contestManager": "0xF20ff35939052A360e2C363Cc4438514C979D703",
+    "fantasyTeamNft": "0x121d38521FaD7A2d6CC4F3065b3b88543Bb49DDD",
+    "legacyPassport": "0x6C40E962502816cFE967a6cD0608938cf83036Fe",
+    "matchRegistry": "0x1D53529Be2bB9C82dF2526A0C99Dc5461F258648",
+    "scoreManager": "0xE9647EE57B4e69eF331618274F6c7e0D122D7111"
   },
   "deployer": "0x8943F7348E2559C6E69eeCb0dA932424C3E6dC66",
-  "generatedAt": 1776255806,
+  "generatedAt": 1776267138,
   "network": "wirefluid-testnet"
 }
