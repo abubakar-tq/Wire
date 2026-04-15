@@ -55,21 +55,30 @@ function getSquadValidationError(squad: Squad): string | null {
   return null;
 }
 
-function getSquadCompositionSummary(squad: Squad): string {
-  const roleCounts = squad.players.reduce<Record<string, number>>((counts, player) => {
-    counts[player.role] = (counts[player.role] ?? 0) + 1;
-    return counts;
-  }, {});
+type SquadComposition = {
+  roles: { WK: number; BAT: number; AR: number; BOWL: number };
+  teams: Array<{ team: string; count: number }>;
+};
+
+function getSquadComposition(squad: Squad): SquadComposition {
+  const roles = squad.players.reduce<SquadComposition["roles"]>(
+    (counts, player) => {
+      counts[player.role] += 1;
+      return counts;
+    },
+    { WK: 0, BAT: 0, AR: 0, BOWL: 0 }
+  );
+
   const teamCounts = squad.players.reduce<Record<string, number>>((counts, player) => {
     counts[player.team] = (counts[player.team] ?? 0) + 1;
     return counts;
   }, {});
-  const teamSummary = Object.entries(teamCounts)
-    .sort(([teamA], [teamB]) => teamA.localeCompare(teamB))
-    .map(([team, count]) => `${team} ${count}`)
-    .join(", ");
 
-  return `Required: 1-4 WK, 3-6 BAT, 1-4 AR, 3-6 BOWL, max 7 per team. Current: WK ${roleCounts.WK ?? 0}, BAT ${roleCounts.BAT ?? 0}, AR ${roleCounts.AR ?? 0}, BOWL ${roleCounts.BOWL ?? 0}${teamSummary ? `, ${teamSummary}` : ""}.`;
+  const teams = Object.entries(teamCounts)
+    .sort(([teamA], [teamB]) => teamA.localeCompare(teamB))
+    .map(([team, count]) => ({ team, count }));
+
+  return { roles, teams };
 }
 
 export default function Page() {
@@ -152,8 +161,8 @@ export default function Page() {
   }, [activeMatchId]);
 
   const squadValidationError = getSquadValidationError(activeSquad);
-  const squadCompositionSummary = getSquadCompositionSummary(activeSquad);
   const isMatchSquadValid = squadValidationError === null;
+  const squadComposition = getSquadComposition(activeSquad);
 
   const isAdmin = roles.admin || roles.operator || roles.scorePublisher || roles.treasury || auth.authenticated;
   const effectiveState = {
@@ -229,7 +238,7 @@ export default function Page() {
             squad={activeSquad}
             isSquadValid={isMatchSquadValid}
             squadValidationError={squadValidationError}
-            squadCompositionSummary={squadCompositionSummary}
+            squadComposition={squadComposition}
             matchStatus={effectiveState.matchStatus}
             activeMatchId={activeMatchId}
             activeMatchLabel={
