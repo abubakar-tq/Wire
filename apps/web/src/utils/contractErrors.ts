@@ -128,6 +128,9 @@ export function normalizeContractError(error: unknown): string {
   if (message.includes("0x04f5bd63")) {
     return formatRevertMessage({ errorName: "InvalidSquadComposition" });
   }
+  if (message.includes("0x2f5f86d0")) {
+    return formatRevertMessage({ errorName: "MatchLocked" });
+  }
 
   return message;
 }
