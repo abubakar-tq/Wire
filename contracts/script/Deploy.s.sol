@@ -17,10 +17,8 @@ contract DeployScript is Script {
     using stdJson for string;
 
     function run() external {
-        uint256 privateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(privateKey);
-
-        vm.startBroadcast(privateKey);
+        vm.startBroadcast();
+        address deployer = msg.sender;
 
         MatchRegistry registry = new MatchRegistry();
         FantasyTeamNFT teamNft = new FantasyTeamNFT(IMatchRegistry(address(registry)));

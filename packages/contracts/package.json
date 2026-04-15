@@ -13,7 +13,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "deploy:testnet": "forge script script/Deploy.s.sol --rpc-url https://evm.wirefluid.com --account burner --sender $SENDER_ADDRESS --broadcast --legacy"
   },
   "dependencies": {
     "viem": "^2.31.0"
