@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # fork-testnet.sh — Fork the WireFluid testnet, deploy contracts, and update all env files.
-# Usage: bash scripts/fork-testnet.sh [FORK_URL] [PORT]
+# Usage: bash scripts/fork-testnet.sh [FORK_URL] [PORT] [CHAIN_ID]
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FORK_URL="${1:-https://evm.wirefluid.com}"
-PORT="${2:-8545}"
+# Use a non-default local port so MetaMask can keep "Anvil (31337) @ 8545"
+# and "WireFluid Local Fork @ 8546" side-by-side.
+PORT="${2:-8546}"
 ANVIL_HOST="127.0.0.1"
 RPC_URL="http://${ANVIL_HOST}:${PORT}"
-FORK_CHAIN_ID=92533
+# IMPORTANT: Use a unique chain id for local forks so wallets (MetaMask) do not
+# treat it as the same network as the real WireFluid testnet (92533).
+FORK_CHAIN_ID="${3:-192533}"
 
 # Anvil default key #0 – safe for local forks only
 PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -145,7 +149,7 @@ forge script script/SeedDemoData.s.sol \
 
 cd "$REPO_ROOT"
 
-# ── Phase 4: Read deployed addresses from 92533.json ─────────────────────────
+# ── Phase 4: Read deployed addresses from deployments/<chainId>.json ─────────
 DEPLOY_JSON="$DEPLOYMENTS_DIR/${FORK_CHAIN_ID}.json"
 if [ ! -f "$DEPLOY_JSON" ]; then
   echo "✗ Deployment JSON not found at $DEPLOY_JSON"

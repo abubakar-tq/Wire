@@ -67,11 +67,11 @@ function isLocalRpc(rpcUrl: string): boolean {
 export function getWireFluidChain(env: Env, options: ConfigOptions = {}) {
   const id = readWireFluidChainId(env, options);
   const rpcUrl = readWireFluidRpcUrl(env, options);
-  const isAnvil = id === ANVIL_CHAIN_ID;
+  const isLocal = isLocalRpc(rpcUrl);
 
   return defineChain({
     id,
-    name: isAnvil ? "WireFluid Local Anvil" : wireFluidTestnet.name,
+    name: isLocal ? "WireFluid Local Fork" : wireFluidTestnet.name,
     nativeCurrency: wireFluidTestnet.nativeCurrency,
     rpcUrls: {
       default: {
