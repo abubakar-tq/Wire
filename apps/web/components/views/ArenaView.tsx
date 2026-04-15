@@ -12,8 +12,9 @@ import { formatWire } from '@/utils/arenaFormat';
 interface ArenaViewProps {
   availablePlayers: CricketPlayer[];
   squad: Squad;
-  creditsUsed: number;
   isSquadValid: boolean;
+  squadValidationError?: string | null;
+  squadCompositionSummary?: string;
   matchStatus: string;
   activeMatchId?: string;
   activeMatchLabel?: string;
@@ -34,8 +35,9 @@ interface ArenaViewProps {
 export function ArenaView({
   availablePlayers,
   squad,
-  creditsUsed,
   isSquadValid,
+  squadValidationError,
+  squadCompositionSummary,
   matchStatus,
   activeMatchId,
   activeMatchLabel,
@@ -56,8 +58,6 @@ export function ArenaView({
   const [showConfirm, setShowConfirm] = useState(false);
   const [showPlayersOnMobile, setShowPlayersOnMobile] = useState(false);
 
-  const creditsAvailable = 100 - creditsUsed;
-
   const captain = squad.players.find((player) => player.id === squad.captainId) ?? null;
   const viceCaptain = squad.players.find((player) => player.id === squad.viceCaptainId) ?? null;
   const fieldPlayers = squad.players.filter((player) => player.id !== squad.captainId && player.id !== squad.viceCaptainId);
@@ -72,7 +72,7 @@ export function ArenaView({
 
   const openConfirm = () => {
     if (!isSquadValid) {
-      setError('Squad must include 11 players with valid captain and vice-captain.');
+      setError(squadValidationError ?? 'Squad must include 11 players, one captain, and one different vice-captain.');
       setTimeout(() => setError(null), 2500);
       return;
     }
@@ -82,7 +82,7 @@ export function ArenaView({
   return (
     <div className="flex-1 grid grid-cols-1 xl:grid-cols-[18rem_minmax(0,1fr)] h-[calc(100vh-73px)] bg-white">
       <aside className="hidden xl:block border-r border-slate-200 overflow-y-auto">
-        <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} creditsUsed={creditsUsed} />
+        <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} />
       </aside>
 
       <section className="overflow-y-auto">
@@ -97,9 +97,8 @@ export function ArenaView({
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <Metric label="Players" value={`${squad.players.length}/11`} tone={squad.players.length === 11 ? 'good' : 'normal'} />
-                <Metric label="Credits" value={`${creditsUsed}/100`} tone={creditsUsed <= 100 ? 'normal' : 'warn'} />
                 <Metric label="State" value={isSquadValid ? 'Ready' : 'Draft'} tone={isSquadValid ? 'good' : 'normal'} />
               </div>
             </div>
@@ -117,7 +116,7 @@ export function ArenaView({
 
           {showPlayersOnMobile ? (
             <div className="xl:hidden rounded-xl border border-slate-200 overflow-hidden">
-              <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} creditsUsed={creditsUsed} />
+              <PlayerList availablePlayers={availablePlayers} onSelectPlayer={onAddPlayer} />
             </div>
           ) : null}
 
@@ -183,6 +182,12 @@ export function ArenaView({
                 >
                   {isJoining ? 'Joining...' : 'Review And Join'}
                 </button>
+                {squadValidationError ? (
+                  <p className="text-xs text-red-600 font-semibold max-w-xs text-right">
+                    {squadValidationError}
+                    {squadCompositionSummary ? <span className="block text-slate-600 font-medium mt-1">{squadCompositionSummary}</span> : null}
+                  </p>
+                ) : null}
                 {txHash ? <p className="text-[10px] text-emerald-600 font-semibold break-all max-w-xs text-right">Tx: {txHash}</p> : null}
                 {txError ? <p className="text-xs text-red-600 font-semibold max-w-xs text-right">{txError}</p> : null}
               </div>
@@ -283,8 +288,13 @@ export function ArenaView({
               </button>
               <button
                 onClick={async () => {
-                  if (onJoinContest) await onJoinContest();
-                  setShowConfirm(false);
+                  try {
+                    if (onJoinContest) await onJoinContest();
+                  } catch {
+                    // Page-level txError already contains the user-facing failure reason.
+                  } finally {
+                    setShowConfirm(false);
+                  }
                 }}
                 disabled={!onJoinContest || isJoining}
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
@@ -367,7 +377,6 @@ function SquadSlot({
       <p className="mt-0.5 truncate text-xs text-slate-500">{player.team}</p>
       <div className="mt-2 flex items-center justify-center gap-1 text-[11px]">
         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700">{player.role}</span>
-        <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700">{player.credits}C</span>
       </div>
       <div className="mt-3 flex items-center justify-center gap-1">
         <button

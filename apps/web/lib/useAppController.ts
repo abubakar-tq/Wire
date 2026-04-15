@@ -25,9 +25,6 @@ export function useAppController() {
       setState((prev) => {
         if (prev.squad.players.length >= 11) return prev;
 
-        const totalCredits = prev.squad.players.reduce((sum, p) => sum + p.credits, 0);
-        if (totalCredits + player.credits > 100) return prev;
-
         if (prev.squad.players.some((p) => p.id === player.id)) return prev;
 
         return {
@@ -136,21 +133,15 @@ export function useAppController() {
     return [];
   }, []);
 
-  // Calculate squad credits used
-  const getCreditsUsed = useCallback(() => {
-    return state.squad.players.reduce((sum, p) => sum + p.credits, 0);
-  }, [state.squad.players]);
-
   // Validate squad
   const isSquadValid = useCallback(() => {
     return (
       state.squad.players.length === 11 &&
-      getCreditsUsed() <= 100 &&
       state.squad.captainId !== null &&
       state.squad.viceCaptainId !== null &&
       state.squad.captainId !== state.squad.viceCaptainId
     );
-  }, [state.squad, getCreditsUsed]);
+  }, [state.squad]);
 
   return {
     state,
@@ -168,7 +159,6 @@ export function useAppController() {
     },
     selectors: {
       getAvailablePlayers,
-      getCreditsUsed,
       isSquadValid,
     },
   };

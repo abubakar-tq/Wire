@@ -158,7 +158,6 @@ export function CricketPitch({
                   <tr>
                     <th className="px-3 md:px-4 py-2 text-left font-semibold text-slate-700 uppercase text-xs tracking-wider">Player</th>
                     <th className="hidden sm:table-cell px-3 md:px-4 py-2 text-center font-semibold text-slate-700 uppercase text-xs tracking-wider">Role</th>
-                    <th className="px-3 md:px-4 py-2 text-center font-semibold text-slate-700 uppercase text-xs tracking-wider">Credits</th>
                     <th className="px-3 md:px-4 py-2 text-center font-semibold text-slate-700 uppercase text-xs tracking-wider">Captain</th>
                     <th className="px-3 md:px-4 py-2 text-center font-semibold text-slate-700 uppercase text-xs tracking-wider">Vice</th>
                     <th className="px-3 md:px-4 py-2 text-center font-semibold text-slate-700 uppercase text-xs tracking-wider">Delete</th>
@@ -174,7 +173,6 @@ export function CricketPitch({
                       <td className="hidden sm:table-cell px-3 md:px-4 py-3 text-center">
                         <span className="text-xs font-medium text-slate-700 bg-slate-100 px-2 py-1 rounded inline-block">{ROLE_LABELS[player.role]}</span>
                       </td>
-                      <td className="px-3 md:px-4 py-3 text-center font-bold text-slate-900 text-sm">{player.credits}</td>
                       <td className="px-3 md:px-4 py-3 text-center">
                         <button
                           onClick={() => onSetCaptain(player.id)}

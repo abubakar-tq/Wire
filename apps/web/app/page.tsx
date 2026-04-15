@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAccount, useChainId, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { contestManagerAbi } from '@wirefluid/contracts';
@@ -19,6 +19,7 @@ import { indexerKeys } from '@/api/useIndexerData';
 import { contractAddresses, contractsConfigured } from '@/contracts/addresses';
 import { configuredChainId } from '@/chains/wireFluidTestnet';
 import { toUint16Array11 } from '@/utils/arenaFormat';
+import { normalizeContractError } from '@/utils/contractErrors';
 import { useRoleChecks } from '@/web3/useRoleChecks';
 import { useSiweSession } from '@/auth/useSiweSession';
 import type { HexString } from '@/api/indexerClient';
@@ -30,19 +31,62 @@ const EMPTY_SQUAD: Squad = {
   viceCaptainId: null
 };
 
+function getSquadValidationError(squad: Squad): string | null {
+  if (squad.players.length !== 11) return "Select exactly 11 players.";
+  if (!squad.captainId) return "Select a captain.";
+  if (!squad.viceCaptainId) return "Select a vice captain.";
+  if (squad.captainId === squad.viceCaptainId) return "Captain and vice captain must be different players.";
+
+  const roleCounts = squad.players.reduce<Record<string, number>>((counts, player) => {
+    counts[player.role] = (counts[player.role] ?? 0) + 1;
+    return counts;
+  }, {});
+  const teamCounts = squad.players.reduce<Record<string, number>>((counts, player) => {
+    counts[player.team] = (counts[player.team] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  if ((roleCounts.WK ?? 0) < 1 || (roleCounts.WK ?? 0) > 4) return "Squad needs 1-4 wicket keepers.";
+  if ((roleCounts.BAT ?? 0) < 3 || (roleCounts.BAT ?? 0) > 6) return "Squad needs 3-6 batters.";
+  if ((roleCounts.AR ?? 0) < 1 || (roleCounts.AR ?? 0) > 4) return "Squad needs 1-4 all-rounders.";
+  if ((roleCounts.BOWL ?? 0) < 3 || (roleCounts.BOWL ?? 0) > 6) return "Squad needs 3-6 bowlers.";
+  if (Object.values(teamCounts).some((count) => count > 7)) return "Use no more than 7 players from one team.";
+
+  return null;
+}
+
+function getSquadCompositionSummary(squad: Squad): string {
+  const roleCounts = squad.players.reduce<Record<string, number>>((counts, player) => {
+    counts[player.role] = (counts[player.role] ?? 0) + 1;
+    return counts;
+  }, {});
+  const teamCounts = squad.players.reduce<Record<string, number>>((counts, player) => {
+    counts[player.team] = (counts[player.team] ?? 0) + 1;
+    return counts;
+  }, {});
+  const teamSummary = Object.entries(teamCounts)
+    .sort(([teamA], [teamB]) => teamA.localeCompare(teamB))
+    .map(([team, count]) => `${team} ${count}`)
+    .join(", ");
+
+  return `Required: 1-4 WK, 3-6 BAT, 1-4 AR, 3-6 BOWL, max 7 per team. Current: WK ${roleCounts.WK ?? 0}, BAT ${roleCounts.BAT ?? 0}, AR ${roleCounts.AR ?? 0}, BOWL ${roleCounts.BOWL ?? 0}${teamSummary ? `, ${teamSummary}` : ""}.`;
+}
+
 export default function Page() {
   const controller = useAppController();
   const [txHash, setTxHash] = useState<HexString | undefined>();
   const [joinError, setJoinError] = useState<string | undefined>();
+  const [isJoinSubmitting, setIsJoinSubmitting] = useState(false);
   const [squadsByMatch, setSquadsByMatch] = useState<Record<string, Squad>>({});
   const [selectedContestId, setSelectedContestId] = useState<string | undefined>();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const live = useLiveArenaData(selectedContestId);
   const roles = useRoleChecks();
   const auth = useSiweSession();
   const { address } = useAccount();
   const chainId = useChainId();
   const queryClient = useQueryClient();
-  const { writeContractAsync, status: writeStatus, error: writeError } = useWriteContract();
+  const { writeContractAsync, error: writeError } = useWriteContract();
   const receipt = useWaitForTransactionReceipt({ hash: txHash });
   const wrongChain = Boolean(address && chainId !== configuredChainId);
 
@@ -69,9 +113,6 @@ export default function Page() {
     updateActiveSquad((current) => {
       if (current.players.length >= 11) return current;
       if (current.players.some((p) => p.id === player.id)) return current;
-
-      const creditsUsed = current.players.reduce((sum, p) => sum + p.credits, 0);
-      if (creditsUsed + player.credits > 100) return current;
 
       return {
         ...current,
@@ -110,17 +151,9 @@ export default function Page() {
     }));
   }, [activeMatchId]);
 
-  const squadCreditsUsed = useMemo(
-    () => activeSquad.players.reduce((sum, player) => sum + player.credits, 0),
-    [activeSquad.players]
-  );
-
-  const isMatchSquadValid =
-    activeSquad.players.length === 11 &&
-    squadCreditsUsed <= 100 &&
-    activeSquad.captainId !== null &&
-    activeSquad.viceCaptainId !== null &&
-    activeSquad.captainId !== activeSquad.viceCaptainId;
+  const squadValidationError = getSquadValidationError(activeSquad);
+  const squadCompositionSummary = getSquadCompositionSummary(activeSquad);
+  const isMatchSquadValid = squadValidationError === null;
 
   const isAdmin = roles.admin || roles.operator || roles.scorePublisher || roles.treasury || auth.authenticated;
   const effectiveState = {
@@ -140,6 +173,7 @@ export default function Page() {
 
   const joinContest = async () => {
     setJoinError(undefined);
+    setTxHash(undefined);
     if (!live.selectedContest) throw new Error('No open contest is available');
     if (!contractsConfigured) {
       setJoinError('Contract addresses are not configured');
@@ -155,6 +189,7 @@ export default function Page() {
     const viceCaptain = activeSquad.players.find((player) => player.id === activeSquad.viceCaptainId);
     if (!captain || !viceCaptain) throw new Error('Captain and vice-captain are required');
 
+    setIsJoinSubmitting(true);
     try {
       const hash = await writeContractAsync({
         address: contractAddresses.contestManager,
@@ -171,8 +206,10 @@ export default function Page() {
       setTxHash(hash);
       clearMatchSquad();
     } catch (error) {
-      setJoinError(error instanceof Error ? error.message : 'Join transaction failed');
+      setJoinError(normalizeContractError(error));
       throw error;
+    } finally {
+      setIsJoinSubmitting(false);
     }
   };
 
@@ -190,8 +227,9 @@ export default function Page() {
           <ArenaView
             availablePlayers={availablePlayers}
             squad={activeSquad}
-            creditsUsed={squadCreditsUsed}
             isSquadValid={isMatchSquadValid}
+            squadValidationError={squadValidationError}
+            squadCompositionSummary={squadCompositionSummary}
             matchStatus={effectiveState.matchStatus}
             activeMatchId={activeMatchId}
             activeMatchLabel={
@@ -205,9 +243,13 @@ export default function Page() {
             onChangeContest={(id: string) => setSelectedContestId(id)}
             selectedContest={live.selectedContest}
             onJoinContest={joinContest}
-            isJoining={writeStatus === 'pending' || receipt.status === 'pending'}
+            isJoining={isJoinSubmitting || Boolean(txHash && receipt.status === 'pending')}
             txHash={txHash}
-            txError={joinError ?? writeError?.message ?? receipt.error?.message}
+            txError={
+              joinError ??
+              (writeError ? normalizeContractError(writeError) : undefined) ??
+              (receipt.error ? normalizeContractError(receipt.error) : undefined)
+            }
             onAddPlayer={addPlayerToMatchSquad}
             onRemovePlayer={removePlayerFromMatchSquad}
             onSetCaptain={setMatchCaptain}
@@ -246,11 +288,21 @@ export default function Page() {
       ) : null}
       <div className={`flex ${wrongChain ? 'h-[calc(100vh-113px)]' : 'h-[calc(100vh-73px)]'} flex-col md:flex-row`}>
         {/* Sidebar - Hidden on mobile, shown on md+ */}
-        <div className="hidden md:block md:w-64 lg:w-64 bg-white border-r border-slate-200 overflow-y-auto">
-          <Sidebar state={effectiveState} onViewChange={actions.setActiveView} hasAdminAccess={isAdmin} />
+        <div
+          className={`hidden md:block bg-white border-r border-slate-200 overflow-y-auto transition-[width] duration-200 ${
+            isSidebarCollapsed ? 'md:w-20' : 'md:w-64'
+          }`}
+        >
+          <Sidebar
+            state={effectiveState}
+            onViewChange={actions.setActiveView}
+            hasAdminAccess={isAdmin}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
+          />
         </div>
         {/* Main Content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-hidden">
           {renderView()}
         </div>
       </div>

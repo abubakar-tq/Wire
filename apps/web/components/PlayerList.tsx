@@ -15,10 +15,9 @@ const ROLE_LABELS: Record<string, string> = {
 interface PlayerListProps {
   availablePlayers: CricketPlayer[];
   onSelectPlayer: (player: CricketPlayer) => void;
-  creditsUsed: number;
 }
 
-export function PlayerList({ availablePlayers, onSelectPlayer, creditsUsed }: PlayerListProps) {
+export function PlayerList({ availablePlayers, onSelectPlayer }: PlayerListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
@@ -90,18 +89,6 @@ export function PlayerList({ availablePlayers, onSelectPlayer, creditsUsed }: Pl
         </div>
       </div>
 
-      {/* Budget Info */}
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 mb-3">
-        <p className="text-xs text-slate-600 mb-1 font-semibold uppercase tracking-wide">Credits Used</p>
-        <div className="flex items-baseline gap-1 mb-2">
-          <span className="text-lg font-bold text-slate-900 tabular-nums">{creditsUsed}</span>
-          <span className="text-xs text-slate-600">/ 100</span>
-        </div>
-        <div className="w-full bg-slate-200 rounded-full h-1.5">
-          <div className="bg-teal-600 h-1.5 rounded-full transition-all" style={{ width: `${creditsUsed}%` }} />
-        </div>
-      </div>
-
       {/* Players List - Compact */}
       <div className="space-y-1.5">
         {filteredPlayers.length > 0 ? (
@@ -128,7 +115,7 @@ export function PlayerList({ availablePlayers, onSelectPlayer, creditsUsed }: Pl
                 <span className="bg-slate-900 text-white text-xs px-1.5 py-0.5 rounded font-medium">
                   {player.team}
                 </span>
-                <span className="text-xs font-bold text-slate-900">{player.credits}C</span>
+                <span className="text-xs font-semibold text-slate-600">{player.role}</span>
               </div>
             </button>
           ))
