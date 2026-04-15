@@ -1,12 +1,11 @@
 'use client';
 
-import { Activity, AlertCircle, BadgeCheck, Database, Settings2, Trophy, Wallet } from 'lucide-react';
+import { Activity, AlertCircle, Database, Settings2, Trophy, Wallet } from 'lucide-react';
 import { useIndexerSummary, useAuditEvents } from '@/api/useIndexerData';
 import { INDEXER_URL } from '@/api/indexerClient';
 import { useRoleChecks } from '@/web3/useRoleChecks';
 import { formatDateTime, formatWire, statusLabel, teamCodeFromBytes } from '@/utils/arenaFormat';
 import { useSiweSession } from '@/auth/useSiweSession';
-import { useCurrentUserPassport } from '@/api/useIndexerData';
 import type { ViewType } from '@/types/index';
 
 interface AdminDashboardViewProps {
@@ -18,12 +17,10 @@ export function AdminDashboardView({ onViewChange }: AdminDashboardViewProps) {
   const audit = useAuditEvents();
   const roles = useRoleChecks();
   const auth = useSiweSession();
-  const passport = useCurrentUserPassport();
   const matches = summary.data?.recentMatches ?? [];
   const contests = summary.data?.recentContests ?? [];
   const treasury = summary.data?.treasury ?? null;
   const pendingFinalization = contests.filter((contest) => !contest.finalized && !contest.cancelled && contest.totalEntries >= 3);
-  const waitingForStats = matches.filter((match) => match.status === 0 || match.status === 1);
   const indexerUnavailable = summary.isError || audit.isError;
 
   const metrics = [
@@ -47,16 +44,26 @@ export function AdminDashboardView({ onViewChange }: AdminDashboardViewProps) {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-            <div className="flex items-center gap-2 mb-3">
-              <BadgeCheck className="w-5 h-5 text-emerald-600" />
+        <div className="mb-8">
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-4 mb-3">
               <h2 className="font-bold text-slate-900">Admin Access</h2>
+              <button
+                onClick={async () => {
+                  if (auth.authenticated) {
+                    await auth.signOut();
+                  } else {
+                    await auth.signIn();
+                  }
+                }}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                {auth.authenticated ? 'Sign out' : 'Verify admin'}
+              </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
               <InfoRow label="Admin verification" value={auth.authenticated ? 'Verified' : 'Not verified'} />
               <InfoRow label="Wallet" value={auth.session?.address ?? 'Connect wallet first'} />
-              <InfoRow label="LegacyPassport" value={passport.data?.passport ? `#${passport.data.passport.tokenId}` : 'No passport yet'} />
               <InfoRow
                 label="Admin roles"
                 value={
@@ -69,26 +76,9 @@ export function AdminDashboardView({ onViewChange }: AdminDashboardViewProps) {
               />
             </div>
           </div>
-
-          <div className="rounded-lg border border-slate-200 bg-slate-900 p-5 text-white shadow-sm">
-            <h2 className="font-bold mb-3">Visibility Notes</h2>
-            <p className="text-sm text-slate-300">This panel is powered by the local indexer. If it is empty, the issue is usually Ponder or the contract addresses, not the UI.</p>
-            <button
-              onClick={async () => {
-                if (auth.authenticated) {
-                  await auth.signOut();
-                } else {
-                  await auth.signIn();
-                }
-              }}
-              className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900"
-            >
-              {auth.authenticated ? 'Sign out' : 'Verify admin'}
-            </button>
-          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-8">
           <button
             onClick={() => onViewChange('MATCH')}
             className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
@@ -104,11 +94,18 @@ export function AdminDashboardView({ onViewChange }: AdminDashboardViewProps) {
             <p className="text-xs text-slate-600 mt-1">Submit match results and fantasy points inputs</p>
           </button>
           <button
+            onClick={() => onViewChange('PLAYERS')}
+            className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
+          >
+            <p className="text-sm font-semibold text-slate-900">Player Database</p>
+            <p className="text-xs text-slate-600 mt-1">Add names, roles, teams, and images for player IDs</p>
+          </button>
+          <button
             onClick={() => onViewChange('TREASURY')}
             className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
           >
-            <p className="text-sm font-semibold text-slate-900">Treasury & Payouts</p>
-            <p className="text-xs text-slate-600 mt-1">Finalize, cancel, claim treasury/rewards/refunds</p>
+            <p className="text-sm font-semibold text-slate-900">Treasury & Audit</p>
+            <p className="text-xs text-slate-600 mt-1">Claim treasury, set treasury address, audit log</p>
           </button>
           <button
             onClick={() => onViewChange('PROTOCOL')}

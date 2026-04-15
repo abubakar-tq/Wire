@@ -1,17 +1,26 @@
 'use client';
 
-import { useState } from 'react';
-import { Activity, AlertCircle, Clock, Database, Settings, Trophy, Wallet } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Activity, AlertCircle, ChevronDown, ChevronUp, Clock, Database, Plus, Settings, Trophy, Wallet } from 'lucide-react';
 import {
   contestManagerAbi,
   fantasyTeamNftAbi,
   legacyPassportAbi,
   matchRegistryAbi
 } from '@wirefluid/contracts';
-import { useAccount } from 'wagmi';
 import { getAddress, isAddress } from 'viem';
 import { contractAddresses, contractsConfigured } from '@/contracts/addresses';
-import { useAuditEvents, useCurrentUserPassport, useIndexedContests, useIndexedMatches, useIndexerSummary } from '@/api/useIndexerData';
+import {
+  useAuditEvents,
+  useIndexedContests,
+  useIndexedMatches,
+  useIndexerHealth,
+  useIndexerSummary
+} from '@/api/useIndexerData';
+import { usePlayerProfiles } from '@/api/usePlayerProfiles';
+import { savePlayerProfiles, type PlayerProfile, type PlayerProfileInput } from '@/api/playerClient';
+import { useTeams, useTeamRefresh, saveTeams, type TeamInput } from '@/api/useTeams';
 import { useArenaWriter } from '@/web3/useArenaWriter';
 import { useRoleChecks } from '@/web3/useRoleChecks';
 import {
@@ -26,6 +35,35 @@ import {
 
 const ROLE_TO_ID: Record<string, number> = { WK: 0, BAT: 1, AR: 2, BOWL: 3 };
 const SIDE_TO_ID: Record<string, number> = { HOME: 1, AWAY: 2 };
+
+/** Shown when a tx has been pending for >8s — almost always a stale MetaMask nonce after Anvil restart */
+function NonceStalenessWarning({ hash }: { hash?: string }) {
+  const [stale, setStale] = useState(false);
+  useEffect(() => {
+    setStale(false);
+    const timer = setTimeout(() => setStale(true), 8_000);
+    return () => clearTimeout(timer);
+  }, [hash]);
+
+  if (!stale) return null;
+  return (
+    <div className="mb-6 rounded-lg border border-orange-300 bg-orange-50 p-4 text-sm text-orange-900">
+      <p className="font-semibold flex items-center gap-2">
+        <AlertCircle className="w-4 h-4" />
+        Transaction stuck pending — likely a stale MetaMask nonce
+      </p>
+      <p className="mt-1 text-orange-800">
+        After restarting Anvil, MetaMask may still remember old nonces. Fix:
+      </p>
+      <ol className="mt-2 ml-4 list-decimal space-y-1 text-orange-800">
+        <li>Open MetaMask → Settings → Advanced</li>
+        <li>Click <strong>"Clear activity tab data"</strong> (resets nonce cache)</li>
+        <li>Reload the page and retry the transaction</li>
+      </ol>
+    </div>
+  );
+}
+
 
 export function ProtocolView() {
   const roles = useRoleChecks();
@@ -140,19 +178,74 @@ export function ProtocolView() {
 export function MatchView() {
   const matches = useIndexedMatches();
   const contests = useIndexedContests();
+  const indexerHealth = useIndexerHealth();
+  const playerProfiles = usePlayerProfiles();
+  const teamsQuery = useTeams();
+  const refreshTeams = useTeamRefresh();
   const writer = useArenaWriter();
   const matchOptions = matches.data ?? [];
   const contestOptions = contests.data ?? [];
+  const activeTeams = useMemo(() => (teamsQuery.data ?? []).filter((t) => t.active), [teamsQuery.data]);
   const [matchId, setMatchId] = useState('');
   const [homeTeam, setHomeTeam] = useState('');
   const [awayTeam, setAwayTeam] = useState('');
   const [lockTime, setLockTime] = useState('');
   const [startTime, setStartTime] = useState('');
   const [playerPoolMatchId, setPlayerPoolMatchId] = useState('');
-  const [playerCsv, setPlayerCsv] = useState('1,WK,HOME\n2,BAT,HOME\n3,BAT,HOME\n4,BAT,HOME\n5,AR,HOME\n6,BOWL,HOME\n7,BOWL,AWAY\n8,BOWL,AWAY\n9,BAT,AWAY\n10,AR,AWAY\n11,WK,AWAY');
+  const [playerSearch, setPlayerSearch] = useState('');
+  const [playerPoolError, setPlayerPoolError] = useState('');
+  const [playerSelections, setPlayerSelections] = useState<Record<number, { selected: boolean; role: string; side: string }>>({});
   const [contestId, setContestId] = useState('');
   const [contestMatchId, setContestMatchId] = useState('');
   const [entryFee, setEntryFee] = useState('0.01');
+  const [showTeamManager, setShowTeamManager] = useState(false);
+  const [newTeamCode, setNewTeamCode] = useState('');
+  const [newTeamName, setNewTeamName] = useState('');
+  const [teamSaving, setTeamSaving] = useState(false);
+  const [teamMessage, setTeamMessage] = useState('');
+
+  // Auto-determine home/away team codes for side assignment
+  const selectedHomeTeam = activeTeams.find((t) => t.teamCode === homeTeam);
+  const selectedAwayTeam = activeTeams.find((t) => t.teamCode === awayTeam);
+
+  const activeProfiles = useMemo(() => (playerProfiles.data ?? []).filter((player) => player.active), [playerProfiles.data]);
+
+  // Resolve the team codes for the selected player-pool match
+  const poolMatch = useMemo(
+    () => matchOptions.find((m) => m.matchId === playerPoolMatchId),
+    [matchOptions, playerPoolMatchId]
+  );
+  const poolHomeCode = poolMatch ? teamCodeFromBytes(poolMatch.homeTeam, '').toUpperCase() : '';
+  const poolAwayCode = poolMatch ? teamCodeFromBytes(poolMatch.awayTeam, '').toUpperCase() : '';
+
+  const filteredProfiles = useMemo(() => {
+    // When a match is selected, only show players from its two teams
+    let source = activeProfiles;
+    if (poolHomeCode && poolAwayCode) {
+      source = source.filter((player) => {
+        const code = (player.teamCode ?? '').toUpperCase();
+        return code === poolHomeCode || code === poolAwayCode;
+      });
+    }
+    const query = playerSearch.trim().toLowerCase();
+    if (query) {
+      source = source.filter((player) =>
+        [player.playerId.toString(), player.name, player.teamCode ?? '', player.role ?? '']
+          .join(' ')
+          .toLowerCase()
+          .includes(query)
+      );
+    }
+    return source.slice(0, 80);
+  }, [activeProfiles, playerSearch, poolHomeCode, poolAwayCode]);
+  const selectedProfileRows = useMemo(
+    () =>
+      Object.entries(playerSelections)
+        .filter(([, value]) => value.selected)
+        .map(([playerId, value]) => ({ playerId: Number(playerId), ...value }))
+        .sort((a, b) => a.playerId - b.playerId),
+    [playerSelections]
+  );
 
   const matchSelectValue = matchOptions.some((match) => match.matchId === matchId) ? matchId : '';
   const playerPoolSelectValue = matchOptions.some((match) => match.matchId === playerPoolMatchId)
@@ -179,22 +272,114 @@ export function MatchView() {
   const canCreateMatch = Boolean(matchId && homeTeam && awayTeam && lockTime && startTime && !matchTimingError);
 
   const createMatch = async () => {
+    const homeLabel = selectedHomeTeam?.teamCode ?? homeTeam;
+    const awayLabel = selectedAwayTeam?.teamCode ?? awayTeam;
     await writer.write({
       address: contractAddresses.matchRegistry,
       abi: matchRegistryAbi,
       functionName: 'createMatch',
-      args: [BigInt(matchId), encodeTeamBytes32(homeTeam), encodeTeamBytes32(awayTeam), toUnixSeconds(startTime), toUnixSeconds(lockTime)]
+      args: [BigInt(matchId), encodeTeamBytes32(homeLabel), encodeTeamBytes32(awayLabel), toUnixSeconds(startTime), toUnixSeconds(lockTime)]
     });
   };
 
-  const setPlayers = async () => {
-    const rows = parsePlayerCsv(playerCsv);
+  const togglePlayerSelection = (player: PlayerProfile, selected: boolean) => {
+    setPlayerSelections((current) => {
+      const currentValue = current[player.playerId];
+      // Auto-determine side based on player's teamCode vs match teams
+      let defaultSide = currentValue?.side ?? 'HOME';
+      if (!currentValue?.side && player.teamCode) {
+        if (player.teamCode.toUpperCase() === awayTeam.toUpperCase()) {
+          defaultSide = 'AWAY';
+        } else if (player.teamCode.toUpperCase() === homeTeam.toUpperCase()) {
+          defaultSide = 'HOME';
+        }
+      }
+      return {
+        ...current,
+        [player.playerId]: {
+          selected,
+          role: currentValue?.role ?? normalizeRole(player.role),
+          side: defaultSide
+        }
+      };
+    });
+  };
+
+  const updatePlayerSelection = (player: PlayerProfile, field: 'role' | 'side', value: string) => {
+    setPlayerSelections((current) => {
+      const currentValue = current[player.playerId];
+      return {
+        ...current,
+        [player.playerId]: {
+          selected: currentValue?.selected ?? true,
+          role: field === 'role' ? value : currentValue?.role ?? normalizeRole(player.role),
+          side: field === 'side' ? value : currentValue?.side ?? 'HOME'
+        }
+      };
+    });
+  };
+
+  const submitSelectedPlayers = async () => {
+    setPlayerPoolError('');
+    if (selectedProfileRows.length === 0) {
+      setPlayerPoolError('Select at least one database player.');
+      return;
+    }
+    if (selectedProfileRows.length > 32) {
+      setPlayerPoolError('A match player pool can include at most 32 players.');
+      return;
+    }
+
+    const playerIds = selectedProfileRows.map((row) => row.playerId);
+    const roles = selectedProfileRows.map((row) => {
+      const roleId = ROLE_TO_ID[row.role];
+      if (roleId === undefined) throw new Error(`Invalid role: ${row.role}`);
+      return roleId;
+    });
+    const teamSides = selectedProfileRows.map((row) => {
+      const sideId = SIDE_TO_ID[row.side];
+      if (sideId === undefined) throw new Error(`Invalid side: ${row.side}`);
+      return sideId;
+    });
+
     await writer.write({
       address: contractAddresses.matchRegistry,
       abi: matchRegistryAbi,
       functionName: 'setMatchPlayers',
-      args: [BigInt(playerPoolMatchId), rows.playerIds, rows.roles, rows.teamSides]
+      args: [BigInt(playerPoolMatchId), playerIds, roles, teamSides]
     });
+  };
+
+  const selectAllBySide = (teamCode: string, side: 'HOME' | 'AWAY') => {
+    const playersForTeam = activeProfiles.filter((p) => p.teamCode?.toUpperCase() === teamCode.toUpperCase());
+    setPlayerSelections((current) => {
+      const updates = { ...current };
+      for (const player of playersForTeam) {
+        updates[player.playerId] = {
+          selected: true,
+          role: updates[player.playerId]?.role ?? normalizeRole(player.role),
+          side
+        };
+      }
+      return updates;
+    });
+  };
+
+  const addTeam = async () => {
+    if (!newTeamCode.trim() || !newTeamName.trim()) return;
+    setTeamSaving(true);
+    setTeamMessage('');
+    try {
+      await saveTeams([{ teamCode: newTeamCode.trim().toUpperCase(), displayName: newTeamName.trim() }]);
+      await refreshTeams();
+      setTeamMessage(`Added ${newTeamCode.trim().toUpperCase()}`);
+      setNewTeamCode('');
+      setNewTeamName('');
+    } catch (error) {
+      setTeamMessage(error instanceof Error ? error.message : 'Failed to save team');
+    } finally {
+      setTeamSaving(false);
+    }
   };
 
   const createContest = async () => {
@@ -225,12 +410,37 @@ export function MatchView() {
         </div>
       )}
 
+      {/* Nonce warning — shown when confirming takes too long (classic post-Anvil-restart issue) */}
+      {writer.isConfirming && (
+        <NonceStalenessWarning hash={writer.hash} />
+      )}
+
       {writer.error && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-start gap-2">
           <AlertCircle className="w-4 h-4 mt-0.5" />
           <span>{writer.error}</span>
         </div>
       )}
+
+      <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="font-semibold text-slate-900">Indexer status</p>
+            <p className="text-slate-600">
+              {indexerHealth.isError
+                ? 'Offline or unreachable. Writes can still confirm on-chain, but tables will not update until Ponder is running.'
+                : indexerHealth.data?.latestBlock
+                  ? `Online · latest indexed block ${indexerHealth.data.latestBlock}`
+                  : 'Online · waiting for indexed events'}
+            </p>
+          </div>
+          {indexerHealth.data?.latestEvent && (
+            <span className="rounded bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+              {indexerHealth.data.latestEvent.contractName}.{indexerHealth.data.latestEvent.eventName}
+            </span>
+          )}
+        </div>
+      </div>
 
       {writer.isConfirming && writer.hash && (
         <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
@@ -245,7 +455,8 @@ export function MatchView() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* ─── Create Match ─── */}
         <section className="rounded-lg border border-slate-200 p-5">
           <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Activity className="w-5 h-5 text-blue-600" />Create Match</h2>
           <div className="space-y-3">
@@ -278,8 +489,31 @@ export function MatchView() {
                 Use next
               </button>
             </div>
-            <input value={homeTeam} onChange={(event) => setHomeTeam(event.target.value)} placeholder="Home team" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-            <input value={awayTeam} onChange={(event) => setAwayTeam(event.target.value)} placeholder="Away team" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+
+            <label className="block text-xs font-semibold text-slate-600">Home team</label>
+            <select
+              value={homeTeam}
+              onChange={(event) => setHomeTeam(event.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            >
+              <option value="">Select home team</option>
+              {activeTeams.filter((t) => t.teamCode !== awayTeam).map((t) => (
+                <option key={t.teamCode} value={t.teamCode}>{t.displayName} ({t.teamCode})</option>
+              ))}
+            </select>
+
+            <label className="block text-xs font-semibold text-slate-600">Away team</label>
+            <select
+              value={awayTeam}
+              onChange={(event) => setAwayTeam(event.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            >
+              <option value="">Select away team</option>
+              {activeTeams.filter((t) => t.teamCode !== homeTeam).map((t) => (
+                <option key={t.teamCode} value={t.teamCode}>{t.displayName} ({t.teamCode})</option>
+              ))}
+            </select>
+
             <label className="block text-xs font-semibold text-slate-600">Lock time</label>
             <input type="datetime-local" value={lockTime} onChange={(event) => setLockTime(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
             <label className="block text-xs font-semibold text-slate-600">Start time</label>
@@ -294,10 +528,64 @@ export function MatchView() {
             >
               Create Match
             </button>
+
+            {/* Inline team management toggle */}
+            <button
+              type="button"
+              onClick={() => setShowTeamManager(!showTeamManager)}
+              className="w-full flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+            >
+              <span>Manage Teams</span>
+              {showTeamManager ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+            {showTeamManager && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                <div className="max-h-40 overflow-y-auto divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+                  {(teamsQuery.data ?? []).map((team) => (
+                    <div key={team.teamCode} className="flex items-center justify-between px-3 py-2 text-sm">
+                      <div>
+                        <span className="font-semibold text-slate-900">{team.teamCode}</span>
+                        <span className="text-slate-500 ml-2">{team.displayName}</span>
+                      </div>
+                      <span className={`rounded px-2 py-0.5 text-xs font-semibold ${team.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {team.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                  ))}
+                  {(teamsQuery.data ?? []).length === 0 && (
+                    <p className="px-3 py-4 text-center text-sm text-slate-500">No teams yet. Add one below.</p>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    value={newTeamCode}
+                    onChange={(event) => setNewTeamCode(event.target.value)}
+                    placeholder="Code (e.g. LQ)"
+                    className="w-full sm:w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                  <input
+                    value={newTeamName}
+                    onChange={(event) => setNewTeamName(event.target.value)}
+                    placeholder="Display name"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { void addTeam(); }}
+                    disabled={teamSaving || !newTeamCode.trim() || !newTeamName.trim()}
+                    className="w-full sm:w-auto rounded-lg bg-slate-900 px-4 py-2 flex items-center justify-center shrink-0 disabled:opacity-50"
+                  >
+                    <Plus className="w-4 h-4 text-white" />
+                  </button>
+                </div>
+                {teamMessage && <p className="text-xs text-slate-600">{teamMessage}</p>}
+              </div>
+            )}
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 p-5">
+        {/* ─── Set Player Pool (DB only) ─── */}
+        <section className="rounded-lg border border-slate-200 p-5 lg:col-span-2 lg:row-start-2">
           <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Database className="w-5 h-5 text-emerald-600" />Set Player Pool</h2>
           <div className="space-y-3">
             <label className="block text-xs font-semibold text-slate-600">Match</label>
@@ -306,35 +594,142 @@ export function MatchView() {
               onChange={(event) => setPlayerPoolMatchId(event.target.value)}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
             >
-              <option value="">Custom match ID</option>
+              <option value="">Select match</option>
               {matchOptions.map((option) => (
                 <option key={option.matchId} value={option.matchId}>
                   #{option.matchId} · {statusLabel(option.status)} · lock {formatDateTime(option.lockTime)}
                 </option>
               ))}
             </select>
-            <input
-              value={playerPoolMatchId}
-              onChange={(event) => setPlayerPoolMatchId(event.target.value)}
-              placeholder="Match ID"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            />
-            <textarea value={playerCsv} onChange={(event) => setPlayerCsv(event.target.value)} rows={10} className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs" />
-            <p className="text-xs text-slate-500">CSV format: `playerId,role,side`; roles WK/BAT/AR/BOWL; sides HOME/AWAY.</p>
-            <p className="text-xs text-slate-500">On-chain storage includes only `playerId`, role, and team side. Player display names are off-chain UI metadata.</p>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Select players from database</p>
+                  <p className="text-xs text-slate-500">
+                    {poolHomeCode && poolAwayCode
+                      ? `Showing players from ${poolHomeCode} and ${poolAwayCode} only.`
+                      : 'Select a match above to filter players by team.'}
+                  </p>
+                </div>
+                <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+                  {selectedProfileRows.length}/32 selected
+                </span>
+              </div>
+              <input
+                value={playerSearch}
+                onChange={(event) => setPlayerSearch(event.target.value)}
+                placeholder="Search by name, ID, role, or team"
+                className="mb-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              />
+
+              {/* Quick select buttons */}
+              {(homeTeam || awayTeam) && (
+                <div className="mb-3 flex gap-2">
+                  {homeTeam && (
+                    <button
+                      type="button"
+                      onClick={() => selectAllBySide(homeTeam, 'HOME')}
+                      className="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Select all {homeTeam} (Home)
+                    </button>
+                  )}
+                  {awayTeam && (
+                    <button
+                      type="button"
+                      onClick={() => selectAllBySide(awayTeam, 'AWAY')}
+                      className="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Select all {awayTeam} (Away)
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div className="max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+                {filteredProfiles.map((player) => {
+                  let defaultSide = 'HOME';
+                  if (player.teamCode?.toUpperCase() === awayTeam.toUpperCase()) defaultSide = 'AWAY';
+                  const selection = playerSelections[player.playerId] ?? {
+                    selected: false,
+                    role: normalizeRole(player.role),
+                    side: defaultSide
+                  };
+                  return (
+                    <div key={player.playerId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0">
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selection.selected}
+                          onChange={(event) => togglePlayerSelection(player, event.target.checked)}
+                          className="mt-1 flex-shrink-0"
+                        />
+                        <div>
+                          <p className="text-sm font-bold text-slate-900 leading-tight break-words">{player.name}</p>
+                          <p className="text-xs text-slate-500 mt-1 break-words">#{player.playerId}{player.teamCode ? ` · ${player.teamCode}` : ''}{player.role ? ` · ${player.role}` : ''}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 pl-6 sm:pl-0 shrink-0 w-full sm:w-auto">
+                        <select
+                          value={selection.role}
+                          onChange={(event) => updatePlayerSelection(player, 'role', event.target.value)}
+                          className="flex-1 sm:flex-none rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold sm:w-24"
+                        >
+                          {Object.keys(ROLE_TO_ID).map((role) => (
+                            <option key={role} value={role}>{role}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={selection.side}
+                          onChange={(event) => updatePlayerSelection(player, 'side', event.target.value)}
+                          className="flex-1 sm:flex-none rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold sm:w-24"
+                        >
+                          <option value="HOME">Home</option>
+                          <option value="AWAY">Away</option>
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })}
+                {!playerProfiles.isLoading && filteredProfiles.length === 0 && (
+                  <p className="px-3 py-8 text-center text-sm text-slate-500">No database players found.</p>
+                )}
+                {playerProfiles.isLoading && (
+                  <p className="px-3 py-8 text-center text-sm text-slate-500">Loading player database...</p>
+                )}
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlayerSelections({});
+                    setPlayerPoolError('');
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                >
+                  Clear Selection
+                </button>
+                <span className="text-right text-xs text-slate-500 self-center">
+                  {selectedProfileRows.length} player{selectedProfileRows.length !== 1 ? 's' : ''} ready
+                </span>
+              </div>
+            </div>
+            {playerPoolError && <p className="text-xs text-red-600">{playerPoolError}</p>}
             <button
               onClick={() => {
-                void setPlayers().catch(() => {});
+                void submitSelectedPlayers().catch(() => {});
               }}
-              disabled={writer.isSubmitting || !playerPoolMatchId}
+              disabled={writer.isSubmitting || !playerPoolMatchId || selectedProfileRows.length === 0}
               className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              Set Players
+              Set Players ({selectedProfileRows.length})
             </button>
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 p-5">
+        {/* ─── Create Contest ─── */}
+        <section className="rounded-lg border border-slate-200 p-5 lg:col-start-2 lg:row-start-1">
           <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-amber-600" />Create Contest</h2>
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -359,19 +754,13 @@ export function MatchView() {
               onChange={(event) => setContestMatchId(event.target.value)}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
             >
-              <option value="">Custom match ID</option>
+              <option value="">Select match</option>
               {matchOptions.map((option) => (
                 <option key={option.matchId} value={option.matchId}>
                   #{option.matchId} · {statusLabel(option.status)} · lock {formatDateTime(option.lockTime)}
                 </option>
               ))}
             </select>
-            <input
-              value={contestMatchId}
-              onChange={(event) => setContestMatchId(event.target.value)}
-              placeholder="Match ID"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            />
             <input value={entryFee} onChange={(event) => setEntryFee(event.target.value)} placeholder="Entry fee in WIRE" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
             <button
               onClick={() => {
@@ -439,16 +828,295 @@ export function MatchView() {
   );
 }
 
+type PlayerFormState = {
+  playerId: string;
+  name: string;
+  teamCode: string;
+  role: PlayerProfileInput['role'];
+  imageUrl: string;
+  active: boolean;
+};
+
+const EMPTY_PLAYER_FORM: PlayerFormState = {
+  playerId: '',
+  name: '',
+  teamCode: '',
+  role: 'BAT',
+  imageUrl: '',
+  active: true
+};
+
+export function PlayerDatabaseView() {
+  const queryClient = useQueryClient();
+  const profiles = usePlayerProfiles();
+  const teamsQuery = useTeams();
+  const activeTeamsList = useMemo(() => (teamsQuery.data ?? []).filter((t) => t.active), [teamsQuery.data]);
+  const [form, setForm] = useState<PlayerFormState>(EMPTY_PLAYER_FORM);
+  const [bulkCsv, setBulkCsv] = useState('101,Babar Azam,PAK,BAT,/players/101.png\n102,Mohammad Rizwan,PAK,WK,/players/102.png');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const players = profiles.data ?? [];
+
+  // Compute used IDs and next available ID
+  const usedIds = useMemo(() => new Set(players.map((p) => p.playerId)), [players]);
+  const nextAvailableId = useMemo(() => {
+    let candidate = 1;
+    while (usedIds.has(candidate)) candidate++;
+    return candidate;
+  }, [usedIds]);
+  // Suggest a range of unused IDs near the end of existing IDs for the dropdown
+  const unusedIdOptions = useMemo(() => {
+    const maxExisting = players.length > 0 ? Math.max(...players.map((p) => p.playerId)) : 0;
+    const options: number[] = [];
+    // Add the very next available
+    for (let i = 1; options.length < 20 && i <= maxExisting + 30; i++) {
+      if (!usedIds.has(i)) options.push(i);
+    }
+    return options;
+  }, [players, usedIds]);
+
+  const setFormField = <K extends keyof PlayerFormState>(field: K, value: PlayerFormState[K]) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const refreshPlayers = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['players'] });
+  };
+
+  const saveSinglePlayer = async () => {
+    setMessage('');
+    setError('');
+    setSaving(true);
+    try {
+      const payload = buildPlayerPayload(form);
+      await savePlayerProfiles([payload]);
+      await refreshPlayers();
+      setMessage(`Saved ${payload.name}.`);
+      setForm(EMPTY_PLAYER_FORM);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save player');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const importBulkPlayers = async () => {
+    setMessage('');
+    setError('');
+    setSaving(true);
+    try {
+      const payload = parsePlayerProfileCsv(bulkCsv);
+      await savePlayerProfiles(payload);
+      await refreshPlayers();
+      setMessage(`Imported ${payload.length} players.`);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to import players');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const editPlayer = (player: PlayerProfile) => {
+    setForm({
+      playerId: player.playerId.toString(),
+      name: player.name,
+      teamCode: player.teamCode ?? '',
+      role: normalizeRole(player.role) as PlayerProfileInput['role'],
+      imageUrl: player.imageUrl ?? '',
+      active: player.active
+    });
+    setMessage('');
+    setError('');
+  };
+
+  return (
+    <div className="flex-1 p-6 md:p-8 overflow-y-auto h-[calc(100vh-73px)] bg-white">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Player Database</h1>
+        <p className="text-slate-600">Store off-chain names, teams, roles, and images for player IDs used by contracts</p>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+        <section className="xl:col-span-2 rounded-lg border border-slate-200 p-5">
+          <h2 className="font-bold text-slate-900 mb-4">Create or update player</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Player ID</label>
+              <div className="flex gap-2">
+                <select
+                  value={form.playerId}
+                  onChange={(event) => setFormField('playerId', event.target.value)}
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                >
+                  <option value="">Select ID ({nextAvailableId} next)</option>
+                  {unusedIdOptions.map((id) => (
+                    <option key={id} value={id.toString()}>
+                      {id}{id === nextAvailableId ? ' (next)' : ''}
+                    </option>
+                  ))}
+                  {/* Allow editing existing player — show used IDs too */}
+                  {form.playerId && usedIds.has(Number(form.playerId)) && (
+                    <option value={form.playerId}>{form.playerId} (editing)</option>
+                  )}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setFormField('playerId', nextAvailableId.toString())}
+                  className="rounded border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 whitespace-nowrap"
+                >
+                  Use next
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Display Name</label>
+              <input
+                value={form.name}
+                onChange={(event) => setFormField('name', event.target.value)}
+                placeholder="e.g. Babar Azam"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Team</label>
+              <select
+                value={form.teamCode}
+                onChange={(event) => setFormField('teamCode', event.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="">Select team</option>
+                {activeTeamsList.map((team) => (
+                  <option key={team.teamCode} value={team.teamCode}>
+                    {team.teamCode} — {team.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <select
+              value={form.role ?? 'BAT'}
+              onChange={(event) => setFormField('role', event.target.value as PlayerProfileInput['role'])}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            >
+              {Object.keys(ROLE_TO_ID).map((role) => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
+            <input
+              value={form.imageUrl}
+              onChange={(event) => setFormField('imageUrl', event.target.value)}
+              placeholder="Image URL or /players/101.png"
+              className="md:col-span-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={form.active}
+                onChange={(event) => setFormField('active', event.target.checked)}
+              />
+              Active player
+            </label>
+          </div>
+          <button
+            onClick={saveSinglePlayer}
+            disabled={saving}
+            className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            Save Player
+          </button>
+        </section>
+
+        <section className="rounded-lg border border-slate-200 p-5">
+          <h2 className="font-bold text-slate-900 mb-4">Bulk import</h2>
+          <textarea
+            value={bulkCsv}
+            onChange={(event) => setBulkCsv(event.target.value)}
+            rows={9}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs"
+          />
+          <p className="mt-2 text-xs text-slate-500">CSV: playerId,name,teamCode,role,imageUrl</p>
+          <button
+            onClick={importBulkPlayers}
+            disabled={saving}
+            className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            Import Players
+          </button>
+        </section>
+      </div>
+
+      {message && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+      <section className="rounded-lg border border-slate-200 overflow-hidden">
+        <div className="border-b border-slate-200 p-5">
+          <h2 className="font-bold text-slate-900">Players</h2>
+          <p className="text-sm text-slate-500">{players.length} profiles loaded from the player API</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="px-4 py-3 text-left">ID</th>
+                <th className="px-4 py-3 text-left">Name</th>
+                <th className="px-4 py-3 text-left">Team</th>
+                <th className="px-4 py-3 text-left">Role</th>
+                <th className="px-4 py-3 text-left">Image</th>
+                <th className="px-4 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {players.map((player) => (
+                <tr key={player.playerId}>
+                  <td className="px-4 py-3 font-mono text-slate-700">{player.playerId}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-900">{player.name}</td>
+                  <td className="px-4 py-3 text-slate-600">{player.teamCode ?? '-'}</td>
+                  <td className="px-4 py-3 text-slate-600">{player.role ?? '-'}</td>
+                  <td className="px-4 py-3">
+                    <span className="line-clamp-1 max-w-[220px] text-xs text-slate-500">{player.imageUrl ?? '-'}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded px-2 py-1 text-xs font-semibold ${player.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                      {player.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => editPlayer(player)}
+                      className="rounded border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!profiles.isLoading && players.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                    No player profiles found. Add players above, then select them in Match & Contest Operations.
+                  </td>
+                </tr>
+              )}
+              {profiles.isLoading && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">Loading player profiles...</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function TreasuryView() {
-  const { address } = useAccount();
   const summary = useIndexerSummary();
-  const passport = useCurrentUserPassport();
   const audit = useAuditEvents();
   const writer = useArenaWriter();
   const [newTreasury, setNewTreasury] = useState('');
   const treasury = summary.data?.treasury ?? null;
-  const balance = passport.data?.balance ?? null;
-  const passportStats = passport.data?.passport ?? null;
 
   const setTreasury = async () => {
     if (!isAddress(newTreasury)) throw new Error('Invalid treasury address');
@@ -463,53 +1131,26 @@ export function TreasuryView() {
   return (
     <div className="flex-1 p-6 md:p-8 overflow-y-auto h-[calc(100vh-73px)] bg-white">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Treasury, Passport & Audit</h1>
-        <p className="text-slate-600">Pull claims, treasury controls, passport lookup, and protocol event history</p>
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Treasury & Audit</h1>
+        <p className="text-slate-600">Claim treasury funds, update treasury address, and review protocol events</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         <div className="rounded-lg border border-slate-200 p-6">
           <Wallet className="w-5 h-5 text-teal-600 mb-3" />
           <p className="text-sm text-slate-600">Treasury claimable</p>
           <p className="text-2xl font-bold text-slate-900">{formatWire(treasury?.claimable ?? '0')}</p>
+          <p className="mt-2 text-xs text-slate-500">Total claimed: {formatWire(treasury?.totalClaimed ?? '0')}</p>
           <button onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'claimTreasury' })} disabled={writer.isSubmitting} className="mt-4 w-full rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Claim Treasury</button>
         </div>
-        <div className="rounded-lg border border-slate-200 p-6">
-          <Trophy className="w-5 h-5 text-amber-600 mb-3" />
-          <p className="text-sm text-slate-600">Claimable rewards</p>
-          <p className="text-2xl font-bold text-slate-900">{formatWire(balance?.claimableReward ?? '0')}</p>
-          <button onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'claimReward' })} disabled={writer.isSubmitting || !address} className="mt-4 w-full rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Claim Reward</button>
-        </div>
-        <div className="rounded-lg border border-slate-200 p-6">
-          <AlertCircle className="w-5 h-5 text-blue-600 mb-3" />
-          <p className="text-sm text-slate-600">Refundable entries</p>
-          <p className="text-2xl font-bold text-slate-900">{formatWire(balance?.refundableAmount ?? '0')}</p>
-          <button onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'claimRefund' })} disabled={writer.isSubmitting || !address} className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Claim Refund</button>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
-        <section className="rounded-lg border border-slate-200 p-5">
+        <section className="rounded-lg border border-slate-200 p-6">
           <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-slate-600" />Treasury Address</h2>
           <p className="mb-3 break-all text-sm text-slate-600">Current: {treasury?.treasury ?? 'Not indexed yet'}</p>
           <input value={newTreasury} onChange={(event) => setNewTreasury(event.target.value)} placeholder="New treasury address" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
           <button onClick={setTreasury} disabled={writer.isSubmitting || !newTreasury} className="mt-3 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Set Treasury</button>
           {writer.hash && <p className="mt-3 break-all text-xs text-slate-500">Tx: {writer.hash}</p>}
           {writer.error && <p className="mt-3 text-xs text-red-600">{writer.error}</p>}
-        </section>
-
-        <section className="rounded-lg border border-slate-200 p-5">
-          <h2 className="font-bold text-slate-900 mb-4">Connected Passport</h2>
-          {passportStats ? (
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <Metric label="Token ID" value={`#${passportStats.tokenId}`} />
-              <Metric label="Contests entered" value={passportStats.contestsEntered.toString()} />
-              <Metric label="Wins" value={passportStats.contestsWon.toString()} />
-              <Metric label="Rewards claimed" value={formatWire(passportStats.totalRewardsClaimed)} />
-            </div>
-          ) : (
-            <p className="text-sm text-slate-600">No passport indexed for the connected wallet yet.</p>
-          )}
         </section>
       </div>
 
@@ -535,15 +1176,6 @@ export function TreasuryView() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-slate-50 p-3">
-      <p className="text-xs text-slate-600">{label}</p>
-      <p className="font-bold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
 function computeNextId(values: Array<string | number | bigint | null | undefined>): string {
   const numeric = values
     .map((value) => Number(value))
@@ -552,28 +1184,62 @@ function computeNextId(values: Array<string | number | bigint | null | undefined
   return String(Math.max(...numeric) + 1);
 }
 
-function parsePlayerCsv(value: string) {
+function normalizeRole(role: string | null | undefined): string {
+  const normalized = role?.trim().toUpperCase();
+  return normalized && normalized in ROLE_TO_ID ? normalized : 'BAT';
+}
+
+function buildPlayerPayload(form: PlayerFormState): PlayerProfileInput {
+  const playerId = Number(form.playerId);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    throw new Error('Player ID must be a positive integer');
+  }
+  const name = form.name.trim();
+  if (!name) {
+    throw new Error('Player name is required');
+  }
+
+  return {
+    playerId,
+    name,
+    teamCode: optionalText(form.teamCode),
+    role: form.role ?? null,
+    imageUrl: optionalText(form.imageUrl),
+    active: form.active,
+    metadata: {}
+  };
+}
+
+function parsePlayerProfileCsv(value: string): PlayerProfileInput[] {
   const rows = value
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.split(',').map((part) => part.trim().toUpperCase()));
+    .filter(Boolean);
 
-  const playerIds: number[] = [];
-  const roles: number[] = [];
-  const teamSides: number[] = [];
-
-  for (const [id, role, side] of rows) {
-    const playerId = Number(id);
-    const roleId = role ? ROLE_TO_ID[role] : undefined;
-    const sideId = side ? SIDE_TO_ID[side] : undefined;
-    if (!Number.isInteger(playerId) || playerId <= 0 || roleId === undefined || sideId === undefined) {
-      throw new Error(`Invalid player row: ${id},${role},${side}`);
-    }
-    playerIds.push(playerId);
-    roles.push(roleId);
-    teamSides.push(sideId);
+  if (rows.length === 0) {
+    throw new Error('Bulk import cannot be empty');
   }
 
-  return { playerIds, roles, teamSides };
+  return rows.map((line) => {
+    const [id, name, teamCode, role, imageUrl] = line.split(',').map((part) => part.trim());
+    const normalizedRole = role ? normalizeRole(role) as PlayerProfileInput['role'] : null;
+    return buildPlayerPayload({
+      playerId: id ?? '',
+      name: name ?? '',
+      teamCode: teamCode ?? '',
+      role: normalizedRole,
+      imageUrl: imageUrl ?? '',
+      active: true
+    });
+  }).map((player, index, players) => {
+    if (players.findIndex((candidate) => candidate.playerId === player.playerId) !== index) {
+      throw new Error(`Duplicate player ID in import: ${player.playerId}`);
+    }
+    return player;
+  });
+}
+
+function optionalText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }

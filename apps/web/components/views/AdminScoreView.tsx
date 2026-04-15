@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle, Loader, Save } from 'lucide-react';
 import { scoreManagerAbi } from '@wirefluid/contracts';
 import { contractAddresses } from '@/contracts/addresses';
 import { useIndexedMatches, useMatchData } from '@/api/useIndexerData';
+import { usePlayerProfiles } from '@/api/usePlayerProfiles';
 import { useArenaWriter } from '@/web3/useArenaWriter';
 import { formatDateTime, roleLabel, safePlayerName, statusLabel, teamSideLabel } from '@/utils/arenaFormat';
 
@@ -52,6 +53,12 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
   const match = useMatchData(matchId);
   const writer = useArenaWriter();
   const [rows, setRows] = useState<StatRow[]>([]);
+  const playerIds = useMemo(() => (match.data?.players ?? []).map((player) => player.playerId), [match.data?.players]);
+  const profiles = usePlayerProfiles(playerIds);
+  const profilesById = useMemo(
+    () => new Map((profiles.data ?? []).map((profile) => [profile.playerId, profile])),
+    [profiles.data]
+  );
 
   useEffect(() => {
     if (!defaultMatchId || matchId) return;
@@ -161,7 +168,7 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
           <tbody className="divide-y divide-slate-200">
             {rows.map((row) => {
               const meta = match.data?.players.find((player) => player.playerId === row.playerId);
-              const displayName = safePlayerName(row.playerId);
+              const displayName = profilesById.get(row.playerId)?.name ?? safePlayerName(row.playerId);
               return (
                 <tr key={row.playerId}>
                   <td className="px-3 py-3 font-semibold text-slate-900">

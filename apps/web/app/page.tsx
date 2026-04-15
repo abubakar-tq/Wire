@@ -13,7 +13,7 @@ import { RewardsView } from '@/components/views/RewardsView';
 import { AdminScoreView } from '@/components/views/AdminScoreView';
 import { AdminDashboardView } from '@/components/views/AdminDashboardView';
 import { DashboardView } from '@/components/views/DashboardView';
-import { ProtocolView, MatchView, TreasuryView } from '@/components/views/AdminStubViews';
+import { ProtocolView, MatchView, PlayerDatabaseView, TreasuryView } from '@/components/views/AdminStubViews';
 import { useLiveArenaData } from '@/hooks/useLiveArenaData';
 import { indexerKeys } from '@/api/useIndexerData';
 import { contractAddresses, contractsConfigured } from '@/contracts/addresses';
@@ -223,6 +223,8 @@ export default function Page() {
         return <ProtocolView />;
       case 'MATCH':
         return <MatchView />;
+      case 'PLAYERS':
+        return <PlayerDatabaseView />;
       case 'SCORE':
         return <AdminScoreView onUpdateScore={actions.updatePlayerPoints} />;
       case 'TREASURY':

@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutDashboard, Zap, Trophy, Gift, Settings, BarChart3, PieChart, Wallet, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Zap, Trophy, Gift, Settings, BarChart3, PieChart, Wallet, ChevronRight, Database } from 'lucide-react';
 import { AppState, ViewType } from '@/types/index';
 import { useState } from 'react';
 
@@ -20,6 +20,7 @@ const PLAYER_MENU = [
 const ADMIN_MENU = [
   { icon: LayoutDashboard, label: 'Dashboard', view: 'ADMIN_DASHBOARD' as ViewType },
   { icon: BarChart3, label: 'Score Panel', view: 'SCORE' as ViewType },
+  { icon: Database, label: 'Players', view: 'PLAYERS' as ViewType },
   { icon: Settings, label: 'Protocol', view: 'PROTOCOL' as ViewType },
   { icon: PieChart, label: 'Match', view: 'MATCH' as ViewType },
   { icon: Wallet, label: 'Treasury', view: 'TREASURY' as ViewType },

@@ -112,7 +112,7 @@ export function Navbar({ state, roles, onViewChange }: NavbarProps) {
               <button
                 onClick={openAdmin}
                 className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-                  ['ADMIN_DASHBOARD', 'PROTOCOL', 'MATCH', 'SCORE', 'TREASURY'].includes(state.activeView)
+                  ['ADMIN_DASHBOARD', 'PROTOCOL', 'MATCH', 'PLAYERS', 'SCORE', 'TREASURY'].includes(state.activeView)
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-700 hover:text-slate-900'
                 }`}
