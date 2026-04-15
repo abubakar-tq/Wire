@@ -186,6 +186,22 @@ contract ContestManagerTest is FantasyArenaTestBase {
         assertEq(uint8(registry.getMatch(MATCH_ID).status), uint8(MatchStatus.Finalized));
     }
 
+    function testViceCaptainNegativeOddScoreRoundsDown() public {
+        _createMatchWithPlayers();
+        _createContest();
+        uint256 aliceToken = _join(alice, _validSquad());
+        _warpPastMatchLock();
+        (uint16[] memory playerIds,,) = _playerPool();
+        PlayerStats[] memory stats = new PlayerStats[](playerIds.length);
+        stats[1].runs = 1;
+        stats[1].duck = true;
+
+        vm.prank(publisher);
+        scores.submitMatchStats(MATCH_ID, playerIds, stats);
+
+        assertEq(contests.previewSquadScore(MATCH_ID, aliceToken), int32(-2));
+    }
+
     function testFinalizeEmitsIndexerEvents() public {
         _createMatchWithPlayers();
         _createContest();

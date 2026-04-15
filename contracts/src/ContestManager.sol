@@ -340,7 +340,12 @@ contract ContestManager is AccessControl, ReentrancyGuard {
 
         // Safe because a squad has 11 players and each player score is bounded by PlayerStats field sizes.
         // forge-lint: disable-next-line(unsafe-typecast)
-        return int32(total + captainBase + (viceCaptainBase / 2));
+        return int32(total + captainBase + _halfRoundedDown(viceCaptainBase));
+    }
+
+    function _halfRoundedDown(int256 value) private pure returns (int256) {
+        if (value >= 0) return value / 2;
+        return -(((-value) + 1) / 2);
     }
 
     function _requireContest(uint256 contestId) private view returns (Contest storage contest) {
