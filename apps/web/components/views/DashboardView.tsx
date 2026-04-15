@@ -1,6 +1,6 @@
 "use client";
 
-import { Award, Gift, Trophy, Users, Wallet, Zap } from "lucide-react";
+import { Award, Gift, Shield, Trophy, Users, Wallet, Zap } from "lucide-react";
 import type { AppState } from "@/types/index";
 import { useCurrentUserPassport, useIndexedContests, useIndexedMatches } from "@/api/useIndexerData";
 import { INDEXER_URL } from "@/api/indexerClient";
