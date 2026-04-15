@@ -14,7 +14,10 @@ interface ArenaViewProps {
   squad: Squad;
   isSquadValid: boolean;
   squadValidationError?: string | null;
-  squadCompositionSummary?: string;
+  squadComposition?: {
+    roles: { WK: number; BAT: number; AR: number; BOWL: number };
+    teams: Array<{ team: string; count: number }>;
+  };
   matchStatus: string;
   activeMatchId?: string;
   activeMatchLabel?: string;
@@ -37,7 +40,7 @@ export function ArenaView({
   squad,
   isSquadValid,
   squadValidationError,
-  squadCompositionSummary,
+  squadComposition,
   matchStatus,
   activeMatchId,
   activeMatchLabel,
@@ -182,11 +185,22 @@ export function ArenaView({
                 >
                   {isJoining ? 'Joining...' : 'Review And Join'}
                 </button>
-                {squadValidationError ? (
-                  <p className="text-xs text-red-600 font-semibold max-w-xs text-right">
-                    {squadValidationError}
-                    {squadCompositionSummary ? <span className="block text-slate-600 font-medium mt-1">{squadCompositionSummary}</span> : null}
-                  </p>
+                {squadValidationError && squadComposition ? (
+                  <div className="w-full md:w-80 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left">
+                    <p className="text-xs font-semibold text-amber-900">{squadValidationError}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Pill label="WK" value={`${squadComposition.roles.WK}`} />
+                      <Pill label="BAT" value={`${squadComposition.roles.BAT}`} />
+                      <Pill label="AR" value={`${squadComposition.roles.AR}`} />
+                      <Pill label="BOWL" value={`${squadComposition.roles.BOWL}`} />
+                      {squadComposition.teams.map((team) => (
+                        <Pill key={team.team} label={team.team} value={`${team.count}`} />
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] leading-snug text-amber-900/80">
+                      Required: 1-4 WK, 3-6 BAT, 1-4 AR, 3-6 BOWL, max 7 per team.
+                    </p>
+                  </div>
                 ) : null}
                 {txHash ? <p className="text-[10px] text-emerald-600 font-semibold break-all max-w-xs text-right">Tx: {txHash}</p> : null}
                 {txError ? <p className="text-xs text-red-600 font-semibold max-w-xs text-right">{txError}</p> : null}
@@ -330,6 +344,15 @@ function DataRow({ label, value }: { label: string; value: string }) {
       <span className="text-slate-600">{label}</span>
       <span className="font-semibold text-slate-900 text-right">{value}</span>
     </div>
+  );
+}
+
+function Pill({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+      <span className="opacity-70">{label}</span>
+      <span className="tabular-nums">{value}</span>
+    </span>
   );
 }
 
