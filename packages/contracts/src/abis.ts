@@ -6,6 +6,39 @@ const accessControlAbiItems = [
 
 export const accessControlAbi = parseAbi(accessControlAbiItems);
 
+const matchRegistryErrorAbiItems = [
+  "error MatchNotFound()",
+  "error MatchAlreadyHasContest(uint256 matchId, uint256 contestId)",
+  "error MatchLocked(uint256 matchId)",
+  "error PlayerNotAllowed(uint256 matchId, uint16 playerId)"
+] as const;
+
+const contestManagerErrorAbiItems = [
+  "error ContestAlreadyExists()",
+  "error ContestCancelled()",
+  "error ContestFinalizedAlready()",
+  "error ContestFull()",
+  "error ContestNotFound()",
+  "error MatchAlreadyHasContest(uint256 matchId, uint256 contestId)",
+  "error MatchLocked(uint256 matchId)",
+  "error NoRefund()",
+  "error NoReward()",
+  "error NoTreasuryBalance()",
+  "error NotEnoughEntries()",
+  "error StatsNotSubmitted(uint256 matchId)",
+  "error WalletEntryLimitReached()",
+  "error WrongEntryFee(uint256 expected, uint256 actual)"
+] as const;
+
+const squadValidationErrorAbiItems = [
+  "error CaptainNotInSquad()",
+  "error CaptainViceCaptainSame()",
+  "error DuplicatePlayer(uint16 playerId)",
+  "error InvalidSquadComposition()",
+  "error PlayerNotAllowed(uint256 matchId, uint16 playerId)",
+  "error ViceCaptainNotInSquad()"
+] as const;
+
 export const matchRegistryAbi = parseAbi([
   "event MatchCreated(uint256 indexed matchId, bytes32 indexed homeTeam, bytes32 indexed awayTeam, uint64 startTime, uint64 lockTime, address operator)",
   "event MatchPlayersSet(uint256 indexed matchId, uint256 playerCount, uint16[] playerIds, uint8[] roles, uint8[] teamSides, address indexed operator)",
@@ -20,6 +53,7 @@ export const matchRegistryAbi = parseAbi([
   "function getPlayerMeta(uint256 matchId, uint16 playerId) view returns ((uint16 playerId, uint8 role, uint8 teamSide, bool allowed))",
   "function isLocked(uint256 matchId) view returns (bool)",
   "function isPlayerAllowed(uint256 matchId, uint16 playerId) view returns (bool)",
+  ...matchRegistryErrorAbiItems,
   ...accessControlAbiItems
 ]);
 
@@ -39,6 +73,7 @@ export const fantasyTeamNftAbi = parseAbi([
   "function isTransferLocked(uint256 tokenId) view returns (bool)",
   "function ownerOf(uint256 tokenId) view returns (address)",
   "function tokenURI(uint256 tokenId) view returns (string)",
+  ...squadValidationErrorAbiItems,
   ...accessControlAbiItems
 ]);
 
@@ -111,6 +146,8 @@ export const contestManagerAbi = parseAbi([
   "function getClaimableReward(address user) view returns (uint256)",
   "function getRefundableEntryAmount(address user) view returns (uint256)",
   "function previewSquadScore(uint256 matchId, uint256 tokenId) view returns (int32)",
+  ...contestManagerErrorAbiItems,
+  ...squadValidationErrorAbiItems,
   ...accessControlAbiItems
 ]);
 
