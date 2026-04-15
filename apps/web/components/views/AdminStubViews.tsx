@@ -915,6 +915,11 @@ export function PlayerDatabaseView() {
 
   // Compute used IDs and next available ID
   const usedIds = useMemo(() => new Set(players.map((p) => p.playerId)), [players]);
+  const existingFormPlayer = useMemo(() => {
+    const playerId = Number(form.playerId);
+    if (!Number.isFinite(playerId)) return null;
+    return players.find((player) => player.playerId === playerId) ?? null;
+  }, [form.playerId, players]);
   const nextAvailableId = useMemo(() => {
     let candidate = 1;
     while (usedIds.has(candidate)) candidate++;
@@ -1128,12 +1133,10 @@ export function PlayerDatabaseView() {
             >
               Save Player
             </button>
-            {form.playerId && usedIds.has(Number(form.playerId)) && (
+            {existingFormPlayer && (
               <button
                 onClick={() => {
-                  if (confirm('Are you sure you want to delete this player from the database?')) {
-                    void handleDeletePlayer();
-                  }
+                  void hardDeletePlayer(existingFormPlayer);
                 }}
                 disabled={saving}
                 className="mt-4 rounded-lg bg-red-100 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50"
