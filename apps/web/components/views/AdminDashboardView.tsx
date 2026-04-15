@@ -5,6 +5,8 @@ import { useIndexerSummary, useAuditEvents } from '@/api/useIndexerData';
 import { INDEXER_URL } from '@/api/indexerClient';
 import { useRoleChecks } from '@/web3/useRoleChecks';
 import { formatDateTime, formatWire, statusLabel, teamCodeFromBytes } from '@/utils/arenaFormat';
+import { formatRelativeTime } from '@/utils/liveTime';
+import { useNow } from '@/hooks/useNow';
 import { useSiweSession } from '@/auth/useSiweSession';
 import type { ViewType } from '@/types/index';
 
@@ -22,6 +24,8 @@ export function AdminDashboardView({ onViewChange }: AdminDashboardViewProps) {
   const treasury = summary.data?.treasury ?? null;
   const pendingFinalization = contests.filter((contest) => !contest.finalized && !contest.cancelled && contest.totalEntries >= 3);
   const indexerUnavailable = summary.isError || audit.isError;
+  const now = useNow();
+  const matchById = new Map(matches.map((match) => [match.matchId, match]));
 
   const metrics = [
     { label: 'Recent matches', value: matches.length.toString(), icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -157,7 +161,10 @@ export function AdminDashboardView({ onViewChange }: AdminDashboardViewProps) {
                       <td className="px-4 py-3">
                         <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{statusLabel(match.status)}</span>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{formatDateTime(match.lockTime)}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        <span className="font-semibold text-slate-800">lock {formatRelativeTime(match.lockTime, now)}</span>
+                        <p className="text-xs text-slate-500">{formatDateTime(match.lockTime)}</p>
+                      </td>
                       <td className="px-4 py-3 text-slate-600">{match.contestId ?? 'None'}</td>
                     </tr>
                   ))}
@@ -200,15 +207,27 @@ export function AdminDashboardView({ onViewChange }: AdminDashboardViewProps) {
               <h2 className="font-bold text-slate-900">Recent Contests</h2>
             </div>
             <div className="divide-y divide-slate-200">
-              {contests.slice(0, 6).map((contest) => (
+              {contests.slice(0, 6).map((contest) => {
+                const match = matchById.get(contest.matchId);
+                const needsRefundPath = !contest.finalized && !contest.cancelled && contest.totalEntries < 3;
+                return (
                 <div key={contest.id} className="p-4 flex items-center justify-between gap-4">
                   <div>
                     <p className="font-semibold text-slate-900">Contest #{contest.contestId}</p>
-                    <p className="text-sm text-slate-600">Match #{contest.matchId} · {contest.totalEntries}/{contest.maxEntries} entries</p>
+                    <p className="text-sm text-slate-600">
+                      Match #{contest.matchId} · {contest.totalEntries}/{contest.maxEntries} entries
+                      {match ? ` · lock ${formatRelativeTime(match.lockTime, now)}` : ''}
+                    </p>
+                    {needsRefundPath ? (
+                      <p className="mt-1 text-xs font-medium text-amber-700">
+                        Below 3 entries. Cancel before match start so entrants can claim refunds.
+                      </p>
+                    ) : null}
                   </div>
                   <span className="text-sm font-semibold text-slate-900">{formatWire(contest.entryFee)}</span>
                 </div>
-              ))}
+                );
+              })}
               {contests.length === 0 && <p className="p-6 text-center text-slate-500">No indexed contests yet.</p>}
             </div>
           </section>

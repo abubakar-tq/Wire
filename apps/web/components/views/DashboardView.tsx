@@ -5,6 +5,8 @@ import type { AppState } from "@/types/index";
 import { useCurrentUserPassport, useIndexedContests, useIndexedMatches } from "@/api/useIndexerData";
 import { INDEXER_URL } from "@/api/indexerClient";
 import { formatDateTime, formatWire, statusLabel, teamCodeFromBytes } from "@/utils/arenaFormat";
+import { formatRelativeTime } from "@/utils/liveTime";
+import { useNow } from "@/hooks/useNow";
 import { getPassportLevel } from "@/utils/passportLevel";
 
 interface DashboardViewProps {
@@ -21,6 +23,7 @@ export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
   const balance = passport.data?.balance ?? null;
   const level = getPassportLevel(passportStats);
   const indexerUnavailable = matches.isError || contests.isError;
+  const now = useNow();
 
   return (
     <div className="flex-1 overflow-y-auto h-[calc(100vh-73px)] bg-white">
@@ -52,6 +55,7 @@ export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
             <div className="divide-y divide-slate-200">
               {openContests.map((contest) => {
                 const match = (matches.data ?? []).find((item) => item.matchId === contest.matchId);
+                const lockLabel = match ? `lock ${formatRelativeTime(match.lockTime, now)}` : null;
                 return (
                   <div key={contest.id} className="p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0">
@@ -63,6 +67,11 @@ export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
                         <span className="rounded bg-slate-100 px-2 py-1">{formatWire(contest.entryFee)}</span>
                         <span className="rounded bg-slate-100 px-2 py-1">{contest.totalEntries}/{contest.maxEntries} entries</span>
                         {match ? <span className="rounded bg-slate-100 px-2 py-1">{statusLabel(match.status)}</span> : null}
+                        {lockLabel ? (
+                          <span title={formatDateTime(match?.lockTime)} className="rounded bg-emerald-50 px-2 py-1 font-semibold text-emerald-700">
+                            {lockLabel}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                     <button
@@ -139,7 +148,10 @@ export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
               <div key={match.id} className="p-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="font-semibold text-slate-900">{teamCodeFromBytes(match.homeTeam, "HOME")} vs {teamCodeFromBytes(match.awayTeam, "AWAY")}</p>
-                  <p className="text-sm text-slate-500">Match #{match.matchId} · lock {formatDateTime(match.lockTime)}</p>
+                  <p className="text-sm text-slate-500">
+                    Match #{match.matchId} · lock {formatRelativeTime(match.lockTime, now)}
+                  </p>
+                  <p className="text-xs text-slate-400">{formatDateTime(match.lockTime)}</p>
                 </div>
                 <span className="w-fit rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{statusLabel(match.status)}</span>
               </div>

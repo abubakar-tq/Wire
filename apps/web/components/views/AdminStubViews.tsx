@@ -19,10 +19,16 @@ import {
   useIndexerSummary
 } from '@/api/useIndexerData';
 import { usePlayerProfiles } from '@/api/usePlayerProfiles';
-import { savePlayerProfiles, type PlayerProfile, type PlayerProfileInput } from '@/api/playerClient';
-import { useTeams, useTeamRefresh, saveTeams, type TeamInput } from '@/api/useTeams';
+import { deletePlayerProfile, savePlayerProfiles, type PlayerProfile, type PlayerProfileInput } from '@/api/playerClient';
+import { useTeams, useTeamRefresh, saveTeams } from '@/api/useTeams';
 import { useArenaWriter } from '@/web3/useArenaWriter';
 import { useRoleChecks } from '@/web3/useRoleChecks';
+import {
+  getCancelContestActionState,
+  getClaimActionState,
+  getCreateContestActionState,
+  getFinalizeContestActionState
+} from '@/utils/actionStates';
 import {
   encodeTeamBytes32,
   formatDateTime,
@@ -32,6 +38,8 @@ import {
   teamCodeFromBytes,
   toUnixSeconds
 } from '@/utils/arenaFormat';
+import { formatRelativeTime } from '@/utils/liveTime';
+import { useNow } from '@/hooks/useNow';
 
 const ROLE_TO_ID: Record<string, number> = { WK: 0, BAT: 1, AR: 2, BOWL: 3 };
 const SIDE_TO_ID: Record<string, number> = { HOME: 1, AWAY: 2 };
@@ -70,6 +78,23 @@ export function ProtocolView() {
   const writer = useArenaWriter();
   const [squadBaseUri, setSquadBaseUri] = useState('');
   const [passportBaseUri, setPassportBaseUri] = useState('');
+  const [appOrigin, setAppOrigin] = useState('');
+  const [metadataDefaultsApplied, setMetadataDefaultsApplied] = useState(false);
+  const recommendedSquadBaseUri = appOrigin ? `${appOrigin}/api/nft/squad/` : '';
+  const recommendedPassportBaseUri = appOrigin ? `${appOrigin}/api/nft/passport/` : '';
+  const squadTokenPreview = squadBaseUri ? `${squadBaseUri}1` : 'Set a base URI to preview token #1';
+  const passportTokenPreview = passportBaseUri ? `${passportBaseUri}1` : 'Set a base URI to preview token #1';
+
+  useEffect(() => {
+    setAppOrigin(window.location.origin);
+  }, []);
+
+  useEffect(() => {
+    if (metadataDefaultsApplied || !recommendedSquadBaseUri || !recommendedPassportBaseUri) return;
+    setSquadBaseUri(recommendedSquadBaseUri);
+    setPassportBaseUri(recommendedPassportBaseUri);
+    setMetadataDefaultsApplied(true);
+  }, [metadataDefaultsApplied, recommendedPassportBaseUri, recommendedSquadBaseUri]);
 
   const contracts = [
     ['MatchRegistry', contractAddresses.matchRegistry],
@@ -130,18 +155,31 @@ export function ProtocolView() {
         <section className="rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="font-bold text-slate-900 mb-4">NFT Metadata</h2>
           <div className="space-y-3">
+            <p className="text-sm text-slate-600">
+              Use the app metadata endpoint as the on-chain base URI. The Pinata sync writes metadata to IPFS, then these routes redirect wallets to the synced JSON.
+            </p>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+              <p className="font-semibold text-slate-900">Recommended squad URI</p>
+              <p className="mt-1 break-all">{recommendedSquadBaseUri || 'Loading app origin...'}</p>
+            </div>
             <input value={squadBaseUri} onChange={(event) => setSquadBaseUri(event.target.value)} placeholder="FantasyTeamNFT base URI" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            <p className="break-all text-xs text-slate-500">Token #1 preview: {squadTokenPreview}</p>
             <button
               onClick={() => writer.write({ address: contractAddresses.fantasyTeamNft, abi: fantasyTeamNftAbi, functionName: 'setBaseURI', args: [squadBaseUri] })}
-              disabled={!squadBaseUri || writer.isSubmitting}
+              disabled={!squadBaseUri || writer.isBusy}
               className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               Set Squad Base URI
             </button>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+              <p className="font-semibold text-slate-900">Recommended passport URI</p>
+              <p className="mt-1 break-all">{recommendedPassportBaseUri || 'Loading app origin...'}</p>
+            </div>
             <input value={passportBaseUri} onChange={(event) => setPassportBaseUri(event.target.value)} placeholder="LegacyPassport base URI" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            <p className="break-all text-xs text-slate-500">Token #1 preview: {passportTokenPreview}</p>
             <button
               onClick={() => writer.write({ address: contractAddresses.legacyPassport, abi: legacyPassportAbi, functionName: 'setBaseURI', args: [passportBaseUri] })}
-              disabled={!passportBaseUri || writer.isSubmitting}
+              disabled={!passportBaseUri || writer.isBusy}
               className="w-full rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               Set Passport Base URI
@@ -183,8 +221,10 @@ export function MatchView() {
   const teamsQuery = useTeams();
   const refreshTeams = useTeamRefresh();
   const writer = useArenaWriter();
+  const now = useNow();
   const matchOptions = matches.data ?? [];
   const contestOptions = contests.data ?? [];
+  const matchById = useMemo(() => new Map(matchOptions.map((match) => [match.matchId, match])), [matchOptions]);
   const activeTeams = useMemo(() => (teamsQuery.data ?? []).filter((t) => t.active), [teamsQuery.data]);
   const [matchId, setMatchId] = useState('');
   const [homeTeam, setHomeTeam] = useState('');
@@ -203,6 +243,11 @@ export function MatchView() {
   const [newTeamName, setNewTeamName] = useState('');
   const [teamSaving, setTeamSaving] = useState(false);
   const [teamMessage, setTeamMessage] = useState('');
+
+  useEffect(() => {
+    setPlayerSelections({});
+    setPlayerPoolError('');
+  }, [playerPoolMatchId]);
 
   // Auto-determine home/away team codes for side assignment
   const selectedHomeTeam = activeTeams.find((t) => t.teamCode === homeTeam);
@@ -254,6 +299,9 @@ export function MatchView() {
   const contestMatchSelectValue = matchOptions.some((match) => match.matchId === contestMatchId)
     ? contestMatchId
     : '';
+  const contestTargetMatch = contestMatchId ? matchById.get(contestMatchId) : undefined;
+  const createContestState = getCreateContestActionState(contestTargetMatch, writer.isBusy);
+  const canCreateContest = Boolean(contestId && contestMatchId && entryFee && !createContestState.disabled);
 
   const nextMatchId = computeNextId(matchOptions.map((match) => match.matchId));
   const nextContestId = computeNextId(contestOptions.map((contest) => contest.contestId));
@@ -288,9 +336,9 @@ export function MatchView() {
       // Auto-determine side based on player's teamCode vs match teams
       let defaultSide = currentValue?.side ?? 'HOME';
       if (!currentValue?.side && player.teamCode) {
-        if (player.teamCode.toUpperCase() === awayTeam.toUpperCase()) {
+        if (player.teamCode.toUpperCase() === poolAwayCode) {
           defaultSide = 'AWAY';
-        } else if (player.teamCode.toUpperCase() === homeTeam.toUpperCase()) {
+        } else if (player.teamCode.toUpperCase() === poolHomeCode) {
           defaultSide = 'HOME';
         }
       }
@@ -383,6 +431,7 @@ export function MatchView() {
   };
 
   const createContest = async () => {
+    if (createContestState.disabled) return;
     await writer.write({
       address: contractAddresses.contestManager,
       abi: contestManagerAbi,
@@ -469,7 +518,7 @@ export function MatchView() {
               <option value="">Custom match ID</option>
               {matchOptions.map((option) => (
                 <option key={option.matchId} value={option.matchId}>
-                  #{option.matchId} · {statusLabel(option.status)} · lock {formatDateTime(option.lockTime)}
+                  #{option.matchId} · {statusLabel(option.status)} · lock {formatRelativeTime(option.lockTime, now)}
                 </option>
               ))}
             </select>
@@ -523,7 +572,7 @@ export function MatchView() {
               onClick={() => {
                 void createMatch().catch(() => {});
               }}
-              disabled={writer.isSubmitting || !canCreateMatch}
+              disabled={writer.isBusy || !canCreateMatch}
               className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               Create Match
@@ -597,7 +646,7 @@ export function MatchView() {
               <option value="">Select match</option>
               {matchOptions.map((option) => (
                 <option key={option.matchId} value={option.matchId}>
-                  #{option.matchId} · {statusLabel(option.status)} · lock {formatDateTime(option.lockTime)}
+                  #{option.matchId} · {statusLabel(option.status)} · lock {formatRelativeTime(option.lockTime, now)}
                 </option>
               ))}
             </select>
@@ -624,24 +673,24 @@ export function MatchView() {
               />
 
               {/* Quick select buttons */}
-              {(homeTeam || awayTeam) && (
+              {(poolHomeCode || poolAwayCode) && (
                 <div className="mb-3 flex gap-2">
-                  {homeTeam && (
+                  {poolHomeCode && (
                     <button
                       type="button"
-                      onClick={() => selectAllBySide(homeTeam, 'HOME')}
+                      onClick={() => selectAllBySide(poolHomeCode, 'HOME')}
                       className="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     >
-                      Select all {homeTeam} (Home)
+                      Select all {poolHomeCode} (Home)
                     </button>
                   )}
-                  {awayTeam && (
+                  {poolAwayCode && (
                     <button
                       type="button"
-                      onClick={() => selectAllBySide(awayTeam, 'AWAY')}
+                      onClick={() => selectAllBySide(poolAwayCode, 'AWAY')}
                       className="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     >
-                      Select all {awayTeam} (Away)
+                      Select all {poolAwayCode} (Away)
                     </button>
                   )}
                 </div>
@@ -650,7 +699,7 @@ export function MatchView() {
               <div className="max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white">
                 {filteredProfiles.map((player) => {
                   let defaultSide = 'HOME';
-                  if (player.teamCode?.toUpperCase() === awayTeam.toUpperCase()) defaultSide = 'AWAY';
+                  if (player.teamCode?.toUpperCase() === poolAwayCode) defaultSide = 'AWAY';
                   const selection = playerSelections[player.playerId] ?? {
                     selected: false,
                     role: normalizeRole(player.role),
@@ -720,7 +769,7 @@ export function MatchView() {
               onClick={() => {
                 void submitSelectedPlayers().catch(() => {});
               }}
-              disabled={writer.isSubmitting || !playerPoolMatchId || selectedProfileRows.length === 0}
+              disabled={writer.isBusy || !playerPoolMatchId || selectedProfileRows.length === 0}
               className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               Set Players ({selectedProfileRows.length})
@@ -757,16 +806,20 @@ export function MatchView() {
               <option value="">Select match</option>
               {matchOptions.map((option) => (
                 <option key={option.matchId} value={option.matchId}>
-                  #{option.matchId} · {statusLabel(option.status)} · lock {formatDateTime(option.lockTime)}
+                  #{option.matchId} · {statusLabel(option.status)} · lock {formatRelativeTime(option.lockTime, now)}
+                  {option.contestId ? ` · Contest #${option.contestId} exists` : ''}
                 </option>
               ))}
             </select>
+            {createContestState.reason ? <p className="text-xs text-amber-700">{createContestState.reason}</p> : null}
+            <p className="text-xs text-slate-500">One contest per match is enforced on-chain.</p>
             <input value={entryFee} onChange={(event) => setEntryFee(event.target.value)} placeholder="Entry fee in WIRE" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
             <button
               onClick={() => {
                 void createContest().catch(() => {});
               }}
-              disabled={writer.isSubmitting || !contestId || !contestMatchId || !entryFee}
+              disabled={!canCreateContest}
+              title={createContestState.reason}
               className="w-full rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               Create Contest
@@ -785,7 +838,8 @@ export function MatchView() {
               <div key={match.id} className="p-4 flex items-center justify-between gap-4">
                 <div>
                   <p className="font-semibold text-slate-900">{teamCodeFromBytes(match.homeTeam, 'HOME')} vs {teamCodeFromBytes(match.awayTeam, 'AWAY')}</p>
-                  <p className="text-sm text-slate-600">#{match.matchId} · {statusLabel(match.status)} · lock {formatDateTime(match.lockTime)}</p>
+                  <p className="text-sm text-slate-600">#{match.matchId} · {statusLabel(match.status)} · lock {formatRelativeTime(match.lockTime, now)}</p>
+                  <p className="text-xs text-slate-400">{formatDateTime(match.lockTime)}</p>
                 </div>
                 <span className="text-sm text-slate-500">{match.playerCount} players</span>
               </div>
@@ -796,43 +850,47 @@ export function MatchView() {
         <section className="rounded-lg border border-slate-200 overflow-hidden">
           <div className="p-5 border-b border-slate-200"><h2 className="font-bold text-slate-900">Indexed Contests</h2></div>
           <div className="divide-y divide-slate-200">
-            {(contests.data ?? []).map((contest) => (
-              <div key={contest.id} className="p-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-semibold text-slate-900">Contest #{contest.contestId}</p>
-                  <p className="text-sm text-slate-600">Match #{contest.matchId} · {contest.totalEntries}/{contest.maxEntries} entries</p>
+            {(contests.data ?? []).map((contest) => {
+              const matchForContest = matchById.get(contest.matchId);
+              const finalizeState = getFinalizeContestActionState(contest, matchForContest, writer.isBusy);
+              const cancelState = getCancelContestActionState(contest, matchForContest, writer.isBusy, now);
+              const helper = finalizeState.helper ?? cancelState.helper;
+
+              return (
+                <div key={contest.id} className="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-900">Contest #{contest.contestId}</p>
+                    <p className="text-sm text-slate-600">
+                      Match #{contest.matchId} · {contest.totalEntries}/{contest.maxEntries} entries
+                      {matchForContest ? ` · lock ${formatRelativeTime(matchForContest.lockTime, now)}` : ''}
+                    </p>
+                    {helper ? <p className="mt-1 text-xs font-medium text-amber-700">{helper}</p> : null}
+                  </div>
+                  <div className="flex flex-col items-start gap-2 md:items-end">
+                    <span className="text-sm font-semibold text-slate-900">{formatWire(contest.entryFee)}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'finalizeContest', args: [BigInt(contest.contestId)] })}
+                        disabled={finalizeState.disabled}
+                        title={finalizeState.reason}
+                        className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                      >
+                        Finalize
+                      </button>
+                      <button
+                        onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'cancelContest', args: [BigInt(contest.contestId)] })}
+                        disabled={cancelState.disabled}
+                        title={cancelState.reason}
+                        className="rounded bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {finalizeState.reason && !helper ? <p className="max-w-xs text-right text-[11px] text-slate-500">{finalizeState.reason}</p> : null}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-900">{formatWire(contest.entryFee)}</span>
-                  {(() => {
-                    const matchForContest = matches.data?.find(m => m.matchId === contest.matchId);
-                    const isTournamentStarted = matchForContest ? Date.now() >= Number(matchForContest.startTime) * 1000 : false;
-                    const isScoreUploaded = matchForContest ? matchForContest.status >= 2 : false;
-                    
-                    return (
-                      <>
-                        <button
-                          onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'finalizeContest', args: [BigInt(contest.contestId)] })}
-                          disabled={writer.isSubmitting || contest.finalized || contest.cancelled || !isScoreUploaded}
-                          title={!isScoreUploaded ? "Match score must be submitted first" : ""}
-                          className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                        >
-                          Finalize
-                        </button>
-                        <button
-                          onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'cancelContest', args: [BigInt(contest.contestId)] })}
-                          disabled={writer.isSubmitting || contest.finalized || contest.cancelled || isTournamentStarted}
-                          title={isTournamentStarted ? "Cannot cancel after match start time" : ""}
-                          className="rounded bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       </div>
@@ -940,6 +998,54 @@ export function PlayerDatabaseView() {
     });
     setMessage('');
     setError('');
+  };
+
+  const playerToInput = (player: PlayerProfile, active: boolean): PlayerProfileInput => ({
+    playerId: player.playerId,
+    name: player.name,
+    teamCode: player.teamCode,
+    role: player.role ? normalizeRole(player.role) as PlayerProfileInput['role'] : null,
+    imageUrl: player.imageUrl,
+    active,
+    metadata: player.metadata
+  });
+
+  const setPlayerActive = async (player: PlayerProfile, active: boolean) => {
+    setMessage('');
+    setError('');
+    setSaving(true);
+    try {
+      await savePlayerProfiles([playerToInput(player, active)]);
+      await refreshPlayers();
+      setMessage(`${active ? 'Activated' : 'Deactivated'} ${player.name}.`);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to update player');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hardDeletePlayer = async (player: PlayerProfile) => {
+    const confirmed = window.confirm(
+      `Delete ${player.name} (#${player.playerId}) from the database? Historical views will fall back to default metadata.`
+    );
+    if (!confirmed) return;
+
+    setMessage('');
+    setError('');
+    setSaving(true);
+    try {
+      await deletePlayerProfile(player.playerId);
+      await refreshPlayers();
+      if (form.playerId === player.playerId.toString()) {
+        setForm(EMPTY_PLAYER_FORM);
+      }
+      setMessage(`Deleted ${player.name}.`);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete player');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -1063,7 +1169,9 @@ export function PlayerDatabaseView() {
       <section className="rounded-lg border border-slate-200 overflow-hidden">
         <div className="border-b border-slate-200 p-5">
           <h2 className="font-bold text-slate-900">Players</h2>
-          <p className="text-sm text-slate-500">{players.length} profiles loaded from the player API</p>
+          <p className="text-sm text-slate-500">
+            {players.length} profiles loaded from the player API. Deactivated players stay in the database but are hidden from match-pool selection.
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1094,12 +1202,28 @@ export function PlayerDatabaseView() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => editPlayer(player)}
-                      className="rounded border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => editPlayer(player)}
+                        className="rounded border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => { void setPlayerActive(player, !player.active); }}
+                        disabled={saving}
+                        className="rounded border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        {player.active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button
+                        onClick={() => { void hardDeletePlayer(player); }}
+                        disabled={saving}
+                        className="rounded border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1129,6 +1253,11 @@ export function TreasuryView() {
   const writer = useArenaWriter();
   const [newTreasury, setNewTreasury] = useState('');
   const treasury = summary.data?.treasury ?? null;
+  const treasuryClaimState = getClaimActionState(
+    treasury?.claimable ?? '0',
+    writer.isBusy,
+    'Treasury has no claimable WIRE right now.'
+  );
 
   const setTreasury = async () => {
     if (!isAddress(newTreasury)) throw new Error('Invalid treasury address');
@@ -1153,14 +1282,22 @@ export function TreasuryView() {
           <p className="text-sm text-slate-600">Treasury claimable</p>
           <p className="text-2xl font-bold text-slate-900">{formatWire(treasury?.claimable ?? '0')}</p>
           <p className="mt-2 text-xs text-slate-500">Total claimed: {formatWire(treasury?.totalClaimed ?? '0')}</p>
-          <button onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'claimTreasury' })} disabled={writer.isSubmitting} className="mt-4 w-full rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Claim Treasury</button>
+          <button
+            onClick={() => writer.write({ address: contractAddresses.contestManager, abi: contestManagerAbi, functionName: 'claimTreasury' })}
+            disabled={treasuryClaimState.disabled}
+            title={treasuryClaimState.reason}
+            className="mt-4 w-full rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            Claim Treasury
+          </button>
+          {treasuryClaimState.reason ? <p className="mt-2 text-xs text-slate-500">{treasuryClaimState.reason}</p> : null}
         </div>
 
         <section className="rounded-lg border border-slate-200 p-6">
           <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-slate-600" />Treasury Address</h2>
           <p className="mb-3 break-all text-sm text-slate-600">Current: {treasury?.treasury ?? 'Not indexed yet'}</p>
           <input value={newTreasury} onChange={(event) => setNewTreasury(event.target.value)} placeholder="New treasury address" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-          <button onClick={setTreasury} disabled={writer.isSubmitting || !newTreasury} className="mt-3 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Set Treasury</button>
+          <button onClick={setTreasury} disabled={writer.isBusy || !newTreasury} className="mt-3 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Set Treasury</button>
           {writer.hash && <p className="mt-3 break-all text-xs text-slate-500">Tx: {writer.hash}</p>}
           {writer.error && <p className="mt-3 text-xs text-red-600">{writer.error}</p>}
         </section>

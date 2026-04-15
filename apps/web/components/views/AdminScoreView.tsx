@@ -7,7 +7,9 @@ import { contractAddresses } from '@/contracts/addresses';
 import { useIndexedMatches, useMatchData } from '@/api/useIndexerData';
 import { usePlayerProfiles } from '@/api/usePlayerProfiles';
 import { useArenaWriter } from '@/web3/useArenaWriter';
-import { formatDateTime, roleLabel, safePlayerName, statusLabel, teamSideLabel } from '@/utils/arenaFormat';
+import { roleLabel, safePlayerName, statusLabel, teamSideLabel } from '@/utils/arenaFormat';
+import { formatRelativeTime } from '@/utils/liveTime';
+import { useNow } from '@/hooks/useNow';
 
 interface AdminScoreViewProps {
   onUpdateScore: (playerId: string, points: number) => void;
@@ -52,6 +54,7 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
   const matchOptions = matches.data ?? [];
   const match = useMatchData(matchId);
   const writer = useArenaWriter();
+  const now = useNow();
   const [rows, setRows] = useState<StatRow[]>([]);
   const playerIds = useMemo(() => (match.data?.players ?? []).map((player) => player.playerId), [match.data?.players]);
   const profiles = usePlayerProfiles(playerIds);
@@ -167,7 +170,7 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
             <option value="">Custom match ID</option>
             {matchOptions.map((option) => (
               <option key={option.matchId} value={option.matchId}>
-                #{option.matchId} · {statusLabel(option.status)} · lock {formatDateTime(option.lockTime)}
+                #{option.matchId} · {statusLabel(option.status)} · lock {formatRelativeTime(option.lockTime, now)}
               </option>
             ))}
           </select>
@@ -273,10 +276,10 @@ export function AdminScoreView({ onUpdateScore }: AdminScoreViewProps) {
         onClick={() => {
           void submitStats().catch(() => {});
         }}
-        disabled={writer.isSubmitting || rows.length === 0 || !matchId}
+        disabled={writer.isBusy || rows.length === 0 || !matchId}
         className="mt-8 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg disabled:opacity-50"
       >
-        {writer.isSubmitting ? <Loader className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+        {writer.isBusy ? <Loader className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
         Submit Stats
       </button>
 
