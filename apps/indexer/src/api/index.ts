@@ -153,7 +153,7 @@ app.get("/leaderboard", async (c) => {
 
   const rows =
     contestId === null
-      ? await db.select().from(contestEntries).orderBy(desc(contestEntries.updatedAtBlock)).limit(readLimit(c, 1000))
+      ? await db.select().from(contestWinners).orderBy(desc(contestWinners.updatedAtBlock)).limit(readLimit(c, 100))
       : await db
           .select()
           .from(contestEntries)
