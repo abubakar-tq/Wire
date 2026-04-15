@@ -92,7 +92,13 @@ export function RewardsView({ wireBalance, onClaimRewards }: RewardsViewProps) {
                         disabled={hasAddedToWallet}
                         onClick={async () => {
                           try {
-                            const imgUrl = `https://api.dicebear.com/9.x/bottts-neutral/png?seed=passport-${profile.tokenId}&backgroundColor=e5e7eb`;
+                            const metaRes = await fetch(`/api/nft/passport/${profile.tokenId}`);
+                            const metaJson = await metaRes.json();
+                            let imgUrl = metaJson.image || '';
+                            // Force MetaMask strictly onto the HTTPS gateway instead of raw IPFS protocol string
+                            if (imgUrl.startsWith('ipfs://')) {
+                              imgUrl = imgUrl.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/');
+                            }
                             await addErc721ToWallet(contractAddresses.legacyPassport, 'PASSPORT', profile.tokenId, imgUrl);
                             setHasAddedToWallet(true);
                             setTimeout(() => setHasAddedToWallet(false), 5000);
