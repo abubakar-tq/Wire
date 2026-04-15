@@ -36,5 +36,15 @@ export const teams = appSchema.table("teams", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });
 
-export type TeamRow = typeof teams.$inferSelect;
-export type NewTeamRow = typeof teams.$inferInsert;
+export const nftMetadata = appSchema.table("nft_metadata", {
+  id: text("id").primaryKey(), // e.g. "passport-1", "squad-42"
+  nftType: text("nft_type").notNull(), // "passport" or "squad"
+  tokenId: integer("token_id").notNull(),
+  imageUri: text("image_uri"), // Pinata gateway format ipfs://...
+  metadataUri: text("metadata_uri"), // Pinata JSON format ipfs://...
+  lastSyncedBlock: integer("last_synced_block").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export type NftMetadataRow = typeof nftMetadata.$inferSelect;
+export type NewNftMetadataRow = typeof nftMetadata.$inferInsert;
