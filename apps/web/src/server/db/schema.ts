@@ -21,3 +21,20 @@ export const players = appSchema.table("players", {
 
 export type PlayerRow = typeof players.$inferSelect;
 export type NewPlayerRow = typeof players.$inferInsert;
+
+/**
+ * PSL teams for the current season.
+ * The admin selects home/away from this table when creating a match.
+ */
+export const teams = appSchema.table("teams", {
+  teamCode: text("team_code").primaryKey(),
+  displayName: text("display_name").notNull(),
+  shortName: text("short_name"),
+  logoUrl: text("logo_url"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export type TeamRow = typeof teams.$inferSelect;
+export type NewTeamRow = typeof teams.$inferInsert;

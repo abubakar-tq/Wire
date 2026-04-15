@@ -2,7 +2,17 @@ export type Role = 'WK' | 'BAT' | 'AR' | 'BOWL';
 export type Team = string;
 export type UserRole = 'PLAYER' | 'ADMIN';
 export type MatchStatus = 'SCHEDULED' | 'LOCKED' | 'LIVE' | 'FINALIZED';
-export type ViewType = 'DASHBOARD' | 'ARENA' | 'LEADERBOARD' | 'REWARDS' | 'ADMIN_DASHBOARD' | 'PROTOCOL' | 'MATCH' | 'SCORE' | 'TREASURY';
+export type ViewType =
+  | 'DASHBOARD'
+  | 'ARENA'
+  | 'LEADERBOARD'
+  | 'REWARDS'
+  | 'ADMIN_DASHBOARD'
+  | 'PROTOCOL'
+  | 'MATCH'
+  | 'PLAYERS'
+  | 'SCORE'
+  | 'TREASURY';
 
 export interface CricketPlayer {
   id: string;
