@@ -1,6 +1,6 @@
 "use client";
 import { motion, useInView, useMotionValue, useSpring, animate } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 interface StatProps {
   value: number;
@@ -21,7 +21,7 @@ function StatCounter({ value, suffix, label, glow, delay }: StatProps) {
       delay,
       duration: 2.5,
       ease: "easeOut",
-      onUpdate: (latest) => {
+      onUpdate: (latest: number) => {
         if (ref.current) {
           ref.current.textContent = Math.round(latest).toLocaleString() + suffix;
         }
@@ -40,7 +40,7 @@ function StatCounter({ value, suffix, label, glow, delay }: StatProps) {
     >
       <span
         className="stat-item__value"
-        style={{ "--stat-glow": glow } as React.CSSProperties}
+        style={{ "--stat-glow": glow } as CSSProperties}
         ref={ref}
       >
         0{suffix}
@@ -52,10 +52,10 @@ function StatCounter({ value, suffix, label, glow, delay }: StatProps) {
 }
 
 const stats: StatProps[] = [
-  { value: 10000, suffix: "+", label: "Active Players", glow: "#0DFFD7", delay: 0 },
-  { value: 500, suffix: "+", label: "Matches Indexed", glow: "#7C3AED", delay: 0.15 },
-  { value: 100, suffix: "%", label: "On-Chain Transparency", glow: "#3B82F6", delay: 0.3 },
-  { value: 50000, suffix: "+", label: "NFTs Minted", glow: "#F59E0B", delay: 0.45 },
+  { value: 10000, suffix: "+", label: "Active Players", glow: "#0d9488", delay: 0 },
+  { value: 500, suffix: "+", label: "Matches Indexed", glow: "#7c3aed", delay: 0.15 },
+  { value: 100, suffix: "%", label: "On-Chain Transparency", glow: "#2563eb", delay: 0.3 },
+  { value: 50000, suffix: "+", label: "NFTs Minted", glow: "#f59e0b", delay: 0.45 },
 ];
 
 export function StatsSection() {

@@ -1,4 +1,6 @@
-export const INDEXER_URL = process.env.NEXT_PUBLIC_INDEXER_URL ?? "http://localhost:42069";
+export const INDEXER_URL =
+  process.env.NEXT_PUBLIC_INDEXER_URL ??
+  (process.env.NODE_ENV === "production" ? "" : "http://localhost:42069");
 const indexerUrl = INDEXER_URL;
 
 export type HexString = `0x${string}`;
@@ -226,6 +228,9 @@ export async function getAuditEvents(init?: RequestInit): Promise<IndexedAuditEv
 }
 
 async function getIndexerJson<T>(path: string, init?: RequestInit): Promise<T> {
+  if (!indexerUrl) {
+    throw new Error("Indexer URL is not configured. Set NEXT_PUBLIC_INDEXER_URL.");
+  }
   const response = await fetch(`${indexerUrl}${path}`, init);
   if (!response.ok) {
     throw new Error(`Indexer request failed with ${response.status}`);

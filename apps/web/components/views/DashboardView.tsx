@@ -2,7 +2,7 @@
 
 import { Award, Gift, Shield, Trophy, Users, Wallet, Zap } from "lucide-react";
 import type { AppState } from "@/types/index";
-import { useCurrentUserPassport, useIndexedContests, useIndexedMatches } from "@/api/useIndexerData";
+import { useCurrentUserPassport, useIndexedContests, useIndexedMatches, useIndexerHealth } from "@/api/useIndexerData";
 import { INDEXER_URL } from "@/api/indexerClient";
 import { formatDateTime, formatWire, statusLabel, teamCodeFromBytes } from "@/utils/arenaFormat";
 import { formatRelativeTime } from "@/utils/liveTime";
@@ -17,6 +17,7 @@ interface DashboardViewProps {
 export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
   const matches = useIndexedMatches();
   const contests = useIndexedContests();
+  useIndexerHealth();
   const passport = useCurrentUserPassport();
   const openContests = (contests.data ?? []).filter((contest) => !contest.finalized && !contest.cancelled);
   const passportStats = passport.data?.passport ?? null;
@@ -38,7 +39,9 @@ export function DashboardView({ state, onBuildSquad }: DashboardViewProps) {
 
         {indexerUnavailable ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Indexer is unreachable at {INDEXER_URL}. Start the Ponder indexer to load matches and contests.
+            {INDEXER_URL
+              ? `Indexer is unreachable at ${INDEXER_URL}. Start the Ponder indexer to load matches and contests.`
+              : "Indexer URL is not configured. Set NEXT_PUBLIC_INDEXER_URL to your Render indexer base URL."}
           </div>
         ) : null}
 
