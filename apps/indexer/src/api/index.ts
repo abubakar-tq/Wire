@@ -17,10 +17,35 @@ import {
 } from "ponder:schema";
 import { desc, eq } from "ponder";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import type { Context } from "hono";
 import { getAddress, isAddress } from "viem";
 
 const app = new Hono();
+
+const corsOrigins = (process.env.CORS_ORIGIN ?? "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const allowedCorsOrigins = new Set<string>([
+  "http://localhost:3000",
+  "http://localhost:3001",
+  ...corsOrigins
+]);
+
+app.use(
+  "*",
+  cors({
+    origin: (origin) => {
+      if (!origin) return "*";
+      return allowedCorsOrigins.has(origin) ? origin : null;
+    },
+    allowHeaders: ["content-type"],
+    allowMethods: ["GET", "POST", "OPTIONS"],
+    credentials: false,
+    maxAge: 86400
+  })
+);
 
 app.get("/healthz", health);
 
