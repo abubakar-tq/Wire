@@ -9,6 +9,7 @@ interface SidebarProps {
   hasAdminAccess?: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  showCollapseToggle?: boolean;
 }
 
 const PLAYER_MENU = [
@@ -27,7 +28,14 @@ const ADMIN_MENU = [
   { icon: Wallet, label: 'Treasury', view: 'TREASURY' as ViewType },
 ];
 
-export function Sidebar({ state, onViewChange, hasAdminAccess = false, isCollapsed, onToggleCollapse }: SidebarProps) {
+export function Sidebar({
+  state,
+  onViewChange,
+  hasAdminAccess = false,
+  isCollapsed,
+  onToggleCollapse,
+  showCollapseToggle = true
+}: SidebarProps) {
   const menuItems = hasAdminAccess ? ADMIN_MENU : PLAYER_MENU;
 
   return (
@@ -72,14 +80,16 @@ export function Sidebar({ state, onViewChange, hasAdminAccess = false, isCollaps
       {/* Toggle & Mode Switch */}
       <div className="p-4 space-y-3">
         {/* Collapse Toggle */}
-        <button
-          onClick={onToggleCollapse}
-          className="w-full px-4 py-2.5 rounded-lg bg-[#FAFAFA] hover:bg-[#F0FDF4] hover:border-[#10B981] border border-[#E5E7EB] transition-smooth text-[#5B6B7A] hover:text-[#0F1117] font-medium text-sm flex items-center justify-center gap-2"
-          title={isCollapsed ? 'Expand' : 'Collapse'}
-        >
-          {isCollapsed ? '→' : '←'}
-          {!isCollapsed && 'Collapse'}
-        </button>
+        {showCollapseToggle ? (
+          <button
+            onClick={onToggleCollapse}
+            className="w-full px-4 py-2.5 rounded-lg bg-[#FAFAFA] hover:bg-[#F0FDF4] hover:border-[#10B981] border border-[#E5E7EB] transition-smooth text-[#5B6B7A] hover:text-[#0F1117] font-medium text-sm flex items-center justify-center gap-2"
+            title={isCollapsed ? 'Expand' : 'Collapse'}
+          >
+            {isCollapsed ? '→' : '←'}
+            {!isCollapsed && 'Collapse'}
+          </button>
+        ) : null}
 
         {/* Role Source */}
         {!isCollapsed && (

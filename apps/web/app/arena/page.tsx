@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { X } from 'lucide-react';
 import { useAccount, useChainId, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { contestManagerAbi } from '@wirefluid/contracts';
 import { useAppController } from '@/lib/useAppController';
@@ -94,6 +95,7 @@ export default function Page() {
   const [squadsByMatch, setSquadsByMatch] = useState<Record<string, Squad>>({});
   const [selectedContestId, setSelectedContestId] = useState<string | undefined>();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const live = useLiveArenaData(selectedContestId);
   const roles = useRoleChecks();
   const auth = useSiweSession();
@@ -334,7 +336,51 @@ export default function Page() {
 
   return (
     <div className="bg-white">
-      <Navbar state={effectiveState} roles={roles} onViewChange={actions.setActiveView} />
+      <Navbar
+        state={effectiveState}
+        roles={roles}
+        onViewChange={actions.setActiveView}
+        onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+      />
+      {isMobileSidebarOpen ? (
+        <div className="fixed inset-0 z-[60] md:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="absolute inset-0 bg-slate-950/45"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+          <aside className="absolute left-0 top-0 h-full w-72 max-w-[86vw] overflow-hidden bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900">WireFluid Arena</p>
+                <p className="text-xs text-slate-500">{isAdmin ? 'Admin navigation' : 'Player navigation'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700"
+                aria-label="Close navigation"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="h-[calc(100%-61px)] overflow-y-auto">
+              <Sidebar
+                state={effectiveState}
+                onViewChange={(view) => {
+                  actions.setActiveView(view);
+                  setIsMobileSidebarOpen(false);
+                }}
+                hasAdminAccess={isAdmin}
+                isCollapsed={false}
+                onToggleCollapse={() => setIsMobileSidebarOpen(false)}
+                showCollapseToggle={false}
+              />
+            </div>
+          </aside>
+        </div>
+      ) : null}
       {wrongChain ? (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm font-medium text-amber-900">
           Switch your wallet to chain {configuredChainId} before submitting transactions.
