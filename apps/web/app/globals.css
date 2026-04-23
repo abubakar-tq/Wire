@@ -1354,6 +1354,15 @@
   flex-wrap: wrap; gap: 1rem;
   font-size: 0.78rem; color: var(--text-muted);
 }
+.landing-footer__bottom-right {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+}
+.landing-footer__source-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.landing-footer__source-link:hover { color: var(--text-primary); }
 .landing-footer__status {
   display: flex; align-items: center; gap: 6px;
   font-size: 0.78rem; color: var(--teal);

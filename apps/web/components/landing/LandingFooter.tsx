@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 
+const SOURCE_CODE_URL = "https://github.com/abubakar-tq/Wire";
+
 const NAV_LINKS = [
   { label: "How It Works", href: "#how-it-works" },
   { label: "NFTs", href: "#nfts" },
@@ -16,7 +18,7 @@ const APP_LINKS = [
 ];
 
 const SOCIAL_LINKS = [
-  { label: "GitHub", href: "https://github.com/abubakar-tq/Wire", icon: "⚡" },
+  { label: "GitHub", href: SOURCE_CODE_URL, icon: "⚡" },
   { label: "Twitter", href: "#", icon: "🐦" },
   { label: "Discord", href: "#", icon: "💬" },
 ];
@@ -91,6 +93,14 @@ export function LandingFooter() {
       <div className="landing-footer__bottom">
         <span>© {new Date().getFullYear()} WireFluid Arena. Powered by WireFluid Testnet.</span>
         <div className="landing-footer__bottom-right">
+          <a
+            href={SOURCE_CODE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="landing-footer__source-link"
+          >
+            Source Code
+          </a>
           <span className="landing-footer__status">
             <span className="landing-footer__status-dot" />
             Testnet Live
